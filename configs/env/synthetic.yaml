@@ -1,0 +1,16 @@
+seed: 7
+macro_interval_game_loops: 32
+max_macro_steps: 96
+map_width: 200.0
+map_height: 200.0
+opponent: economy_bot
+reward:
+  terminal_win: 1.0
+  terminal_loss: -1.0
+  terminal_draw: 0.0
+  army_advantage_scale: 0.02
+  worker_advantage_scale: 0.005
+  base_advantage_scale: 0.02
+  technology_progress_scale: 0.01
+  successful_scout_scale: 0.01
+  map_control_scale: 0.005

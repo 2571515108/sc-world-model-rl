@@ -1,0 +1,16 @@
+env_config: configs/env/synthetic.yaml
+ppo_config: configs/model/ppo.yaml
+world_model_checkpoint: outputs/checkpoints/world_model.pt
+policy_checkpoint: outputs/checkpoints/ppo_synthetic.pt
+checkpoint_path: outputs/checkpoints/hybrid_policy.pt
+replay_path: outputs/synthetic_replay.npz
+updates: 10
+rollout_steps: 256
+imagination_weight_max: 0.5
+imagination_warmup_updates: 2
+imagined_batch_size: 4
+imagined_sequence_length: 8
+imagination_horizon: 8
+uncertainty_threshold: 1.0
+seed: 7
+device: auto

@@ -1,0 +1,8 @@
+env_config: configs/env/synthetic.yaml
+ppo_config: configs/model/ppo.yaml
+seed: 7
+device: auto
+episodes: 400
+rollout_steps: 1024
+evaluation_episodes: 32
+checkpoint_path: outputs/checkpoints/ppo_synthetic.pt

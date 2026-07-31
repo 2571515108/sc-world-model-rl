@@ -1,0 +1,6 @@
+seed: 7
+snapshot_every_updates: 10
+scripted_weight: 0.4
+recent_weight: 0.3
+historical_weight: 0.2
+exploiter_weight: 0.1

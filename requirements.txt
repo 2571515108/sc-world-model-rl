@@ -1,0 +1,12 @@
+numpy>=1.24
+PyYAML>=6.0
+# Default Windows install: CUDA 12.8 GPU build of the current stable PyTorch.
+# Change cu128 to cu126/cu118 only when the installed NVIDIA driver requires it.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.0+cu128; platform_system == "Windows"
+torch>=2.2; platform_system != "Windows"
+pytest>=8.0
+matplotlib>=3.8
+pandas>=2.1
+tensorboard>=2.16
+# Optional for a real SC2 client/backend: burnysc2>=6.6

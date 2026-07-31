@@ -1,0 +1,17 @@
+reporting:
+  smoothing:
+    method: ema
+    factor: 0.95
+  formats: [png, svg]
+post_training:
+  enabled: true
+  evaluate:
+    enabled: true
+    episodes_per_opponent: 20
+    deterministic: true
+  plots:
+    enabled: true
+  report:
+    enabled: true
+  realtime_demo:
+    enabled: false

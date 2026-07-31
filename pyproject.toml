@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sc2-world-model-league-agent"
+version = "0.1.0"
+description = "Phase 0/1 macro-RL baseline for SC2 world-model research"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "PyYAML>=6.0", "torch>=2.2", "matplotlib>=3.8", "pandas>=2.1", "tensorboard>=2.16"]
+
+[project.optional-dependencies]
+sc2 = ["burnysc2>=6.6"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+include = ["sc2wmrl*"]

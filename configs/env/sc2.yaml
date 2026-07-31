@@ -1,0 +1,5 @@
+seed: 7
+macro_interval_game_loops: 32
+# A RealSC2Backend implementation must be supplied by the hosting bot/runtime.
+map_name: "Abyssal Reef LE"
+opponent: economy_bot
