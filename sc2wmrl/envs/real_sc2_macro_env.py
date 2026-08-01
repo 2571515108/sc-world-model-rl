@@ -13,6 +13,7 @@ import numpy as np
 
 from .base_macro_env import InfoDict, MacroAction, MacroSC2Env, Observation
 from .feature_extractor import FeatureExtractor
+from .reward import RewardConfig, RewardTracker, reward_metrics_from_state
 
 
 class RealSC2UnavailableError(RuntimeError):
@@ -39,24 +40,30 @@ class RealSC2MacroEnv(MacroSC2Env):
     """Normalizes observations from a supplied real-game backend."""
 
     def __init__(self, backend: RealSC2Backend | None, *, macro_interval_game_loops: int = 32,
-                 map_width: float = 200.0, map_height: float = 200.0) -> None:
+                 max_macro_steps: int = 256, map_width: float = 200.0, map_height: float = 200.0,
+                 reward: RewardConfig | None = None) -> None:
         if backend is None:
             raise RealSC2UnavailableError(
                 "RealSC2MacroEnv requires a RealSC2Backend from a configured python-sc2/Ares bot runtime; "
                 "SyntheticMacroEnv remains fully available without SC2."
             )
-        if macro_interval_game_loops <= 0:
-            raise ValueError("macro interval must be positive")
+        if macro_interval_game_loops <= 0 or max_macro_steps <= 0:
+            raise ValueError("macro interval and maximum steps must be positive")
         self.backend = backend
         self.macro_interval_game_loops = macro_interval_game_loops
+        self.max_macro_steps = max_macro_steps
         self.extractor = FeatureExtractor(map_width, map_height)
         self.observation_dim = self.extractor.dimension
         self._state: dict[str, Any] | None = None
+        self._steps = 0
+        self._reward = RewardTracker(reward or RewardConfig())
 
     def reset(self, *, seed: int | None = None) -> tuple[Observation, InfoDict]:
         """Reset the delegated game and expose its normalized state."""
         state, info = self.backend.reset_game(seed)
         self._state = state
+        self._steps = 0
+        self._reward.reset(reward_metrics_from_state(state))
         return self.extractor.extract(state), self._validated_info(info)
 
     def step(self, macro_action: int) -> tuple[Observation, float, bool, bool, InfoDict]:
@@ -66,10 +73,17 @@ class RealSC2MacroEnv(MacroSC2Env):
         action = self.validate_action(macro_action)
         if not self.get_action_mask()[action]:
             raise ValueError(f"illegal macro action {action.name}")
-        state, reward, terminated, truncated, info = self.backend.execute_macro(action, self.macro_interval_game_loops)
+        state, _, terminated, truncated, info = self.backend.execute_macro(action, self.macro_interval_game_loops)
+        self._steps += 1
+        outcome = str(info.get("outcome", "")) or None
+        truncated = bool(truncated or (not terminated and self._steps >= self.max_macro_steps))
+        if truncated and outcome is None:
+            outcome = "draw"
+        reward, components = self._reward.step(reward_metrics_from_state(state), outcome)
         if not np.isfinite(reward):
-            raise ValueError("real SC2 backend returned a non-finite reward")
+            raise FloatingPointError("real SC2 reward is non-finite")
         self._state = state
+        info = dict(info); info["reward_components"] = components; info["outcome"] = outcome; info["step"] = self._steps
         return self.extractor.extract(state), float(reward), bool(terminated), bool(truncated), self._validated_info(info)
 
     def get_action_mask(self) -> np.ndarray:
@@ -86,4 +100,6 @@ class RealSC2MacroEnv(MacroSC2Env):
     def _validated_info(self, info: dict[str, Any]) -> InfoDict:
         copied = dict(info)
         copied["action_mask"] = self.get_action_mask().copy()
+        copied.setdefault("environment_type", "real_sc2")
+        copied.setdefault("raw_state", self._state)
         return copied

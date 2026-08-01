@@ -1,0 +1,17 @@
+dataset_mode: mixed
+synthetic_replay_path: outputs/synthetic_collector_replay.npz
+real_replay_path: outputs/real_sc2_replay.npz
+synthetic_ratio: 0.2
+real_ratio: 0.8
+model_config: configs/model/rssm.yaml
+checkpoint_path: outputs/checkpoints/world_model_mixed.pt
+updates: 5000
+batch_size: 32
+sequence_length: 32
+burn_in_length: 8
+learning_rate: 0.0002
+max_grad_norm: 100.0
+seed: 7
+device: auto
+validation_fraction: 0.1
+validation_interval: 100

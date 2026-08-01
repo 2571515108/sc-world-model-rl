@@ -40,7 +40,8 @@ def main() -> None:
             replay.append(MacroTransition(observation=observation, entity_observation=None, action=action, action_mask=mask, reward=reward,
                 terminated=terminated, truncated=truncated, next_observation=next_observation, opponent_id=str(info["opponent_id"]),
                 opponent_type=str(info["opponent_type"]), policy_version="random-control", map_name="synthetic", game_loop=int(info["game_loop"]),
-                events=np.zeros(7, dtype=np.float32), info={"reward_components": next_info.get("reward_components", {}), "opponent_action": next_info.get("opponent_action", 0), "enemy_strategy": next_info.get("enemy_strategy", "unknown")}, episode_id=episode))
+                events=np.zeros(7, dtype=np.float32), info={"reward_components": next_info.get("reward_components", {}), "opponent_action": next_info.get("opponent_action", 0), "enemy_strategy": next_info.get("enemy_strategy", "unknown"), "environment_type": "synthetic"}, episode_id=episode,
+                next_action_mask=np.asarray(next_info["action_mask"], dtype=np.bool_), opponent_action=int(next_info.get("opponent_action", 0)), environment_type="synthetic"))
             observation, info, done = next_observation, next_info, terminated or truncated
     output = Path(args.output); replay.save(output); loaded = ReplayBuffer.load(output, seed=env.config.seed)
     if len(loaded) != len(replay): raise RuntimeError("replay reload integrity check failed")

@@ -1,0 +1,15 @@
+env_config: configs/env/sc2.yaml
+world_model_checkpoint: outputs/checkpoints/world_model_real.pt
+policy_checkpoint: outputs/checkpoints/ppo_synthetic.pt
+checkpoint_path: outputs/checkpoints/hybrid_real.pt
+replay_path: outputs/real_sc2_replay.npz
+updates: 100
+rollout_steps: 512
+imagination_weight_max: 0.3
+imagination_warmup_updates: 20
+imagined_batch_size: 8
+imagined_sequence_length: 16
+imagination_horizon: 12
+uncertainty_threshold: 1.0
+seed: 7
+device: auto

@@ -9,4 +9,4 @@ pytest>=8.0
 matplotlib>=3.8
 pandas>=2.1
 tensorboard>=2.16
-# Optional for a real SC2 client/backend: burnysc2>=6.6
+# Optional for a real SC2 client/backend. Install with: pip install "burnysc2>=6.6"

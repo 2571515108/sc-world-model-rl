@@ -26,6 +26,7 @@ def sequence_batch(sequences: list[list[object]], device: str = "cpu") -> dict[s
     strategy_ids = {"rush": 0, "economy": 1, "defensive": 2, "ground_tech": 3, "air_tech": 4, "unknown": 5}
     strategies = np.asarray([strategy_ids.get(str(sequence[0].info.get("enemy_strategy", "unknown")).removesuffix("_bot"), 5) for sequence in sequences], dtype=np.int64)
     opponent_ids = np.asarray([zlib.crc32(sequence[0].opponent_id.encode()) % 128 for sequence in sequences], dtype=np.int64)
+    source_is_real = np.asarray([float(sequence[0].environment_type == "real_sc2") for sequence in sequences], dtype=np.float32)
     return {"observations": torch.as_tensor(observations, device=device), "actions": torch.as_tensor(actions, device=device),
             "rewards": torch.as_tensor(rewards, device=device), "continues": torch.as_tensor(continues, device=device),
             "events": torch.as_tensor(events, device=device), "opponent_actions": torch.as_tensor(opponent_actions, device=device), "opponent_ids": torch.as_tensor(opponent_ids, device=device), "strategy_targets": torch.as_tensor(strategies, device=device)}
@@ -42,10 +43,22 @@ class WorldModelTrainer:
     def train_step(self, sequences: list[list[object]]) -> dict[str, float]:
         """Run one finite, clipped optimization update."""
         batch = sequence_batch(sequences, self.device); self.model.train()
+        if not torch.isfinite(batch["observations"]).all() or not torch.isfinite(batch["rewards"]).all():
+            raise FloatingPointError("world-model batch contains NaN or Inf")
         loss: WorldModelLoss = self.model.loss(**batch)
         self.optimizer.zero_grad(set_to_none=True); loss.total.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm); self.optimizer.step()
-        return {item.name: float(getattr(loss, item.name).detach().item()) for item in fields(loss)}
+        metrics = {item.name: float(getattr(loss, item.name).detach().item()) for item in fields(loss)}
+        metrics["real_data_ratio"] = float(sum(sequence[0].environment_type == "real_sc2" for sequence in sequences) / len(sequences))
+        metrics["synthetic_data_ratio"] = 1.0 - metrics["real_data_ratio"]
+        return metrics
+
+    @torch.no_grad()
+    def validation_step(self, sequences: list[list[object]]) -> dict[str, float]:
+        """Evaluate held-out sequences without optimizer updates."""
+        batch = sequence_batch(sequences, self.device); self.model.eval()
+        loss: WorldModelLoss = self.model.loss(**batch)
+        return {f"validation_{item.name}": float(getattr(loss, item.name).detach().item()) for item in fields(loss)}
 
     @torch.no_grad()
     def open_loop_evaluate(self, sequences: list[list[object]]) -> dict[str, float]:

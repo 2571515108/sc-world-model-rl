@@ -23,4 +23,6 @@ class RealAdapterTests(unittest.TestCase):
         with self.assertRaises(RealSC2UnavailableError): RealSC2MacroEnv(None)
     def test_protocol_backend_steps(self) -> None:
         env = RealSC2MacroEnv(Backend()); observation, _ = env.reset(); self.assertEqual(observation.shape, (env.observation_dim,))
-        _, _, _, truncated, _ = env.step(MacroAction.NO_OP); self.assertTrue(truncated)
+        _, reward, _, truncated, info = env.step(MacroAction.NO_OP); self.assertTrue(truncated)
+        self.assertTrue(np.isfinite(reward)); self.assertEqual(info["environment_type"], "real_sc2")
+        self.assertIn("reward_components", info)

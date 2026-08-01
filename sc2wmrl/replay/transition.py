@@ -30,19 +30,23 @@ class MacroTransition:
     events: np.ndarray
     info: dict[str, Any] = field(default_factory=dict)
     episode_id: int = 0
+    next_action_mask: np.ndarray | None = None
+    opponent_action: int = 0
+    environment_type: str = "synthetic"
 
     def __post_init__(self) -> None:
         """Normalize dtypes and reject corrupt/non-finite replay records early."""
         self.observation = np.asarray(self.observation, dtype=np.float32)
         self.next_observation = np.asarray(self.next_observation, dtype=np.float32)
         self.action_mask = np.asarray(self.action_mask, dtype=np.bool_)
+        self.next_action_mask = self.action_mask.copy() if self.next_action_mask is None else np.asarray(self.next_action_mask, dtype=np.bool_)
         self.events = np.asarray(self.events, dtype=np.float32)
         if self.entity_observation is not None:
             self.entity_observation = np.asarray(self.entity_observation, dtype=np.float32)
         if self.observation.ndim != 1 or self.next_observation.shape != self.observation.shape:
             raise ValueError("observations must be matching one-dimensional vectors")
-        if self.action_mask.shape != (ACTION_COUNT,) or not self.action_mask.any():
-            raise ValueError("transition action mask is invalid")
+        if self.action_mask.shape != (ACTION_COUNT,) or not self.action_mask.any() or self.next_action_mask.shape != (ACTION_COUNT,) or not self.next_action_mask.any():
+            raise ValueError("transition action masks are invalid")
         if isinstance(self.action, bool) or not 0 <= int(self.action) < ACTION_COUNT or not self.action_mask[int(self.action)]:
             raise ValueError("transition action must be legal under its action mask")
         if not np.isfinite(self.observation).all() or not np.isfinite(self.next_observation).all() or not np.isfinite(self.events).all():
@@ -51,3 +55,7 @@ class MacroTransition:
             raise ValueError("transition reward must be finite")
         if self.game_loop < 0 or self.episode_id < 0:
             raise ValueError("game loop and episode ID must be non-negative")
+        if isinstance(self.opponent_action, bool) or not 0 <= int(self.opponent_action) < ACTION_COUNT:
+            raise ValueError("opponent action must be a valid macro action")
+        if self.environment_type not in {"synthetic", "real_sc2"}:
+            raise ValueError("environment type must be synthetic or real_sc2")

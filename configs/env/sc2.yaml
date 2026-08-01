@@ -1,5 +1,20 @@
+environment:
+  type: real_sc2
+  map_name: "AcropolisLE"
+  race: Terran
+  opponent:
+    type: builtin
+    race: Terran
+    difficulty: Medium
+  macro_interval_game_loops: 32
+  max_macro_steps: 256
+  realtime: false
+  timeout_seconds: 120
 seed: 7
-macro_interval_game_loops: 32
-# A RealSC2Backend implementation must be supplied by the hosting bot/runtime.
-map_name: "Abyssal Reef LE"
-opponent: economy_bot
+map_width: 200.0
+map_height: 200.0
+reward:
+  terminal_win: 1.0
+  terminal_loss: -1.0
+  terminal_draw: 0.0
+  clip_value: 1.0

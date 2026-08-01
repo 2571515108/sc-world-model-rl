@@ -84,13 +84,58 @@ The implementation guarantees executable training and metrics code but does not 
 
 ## Real SC2 Integration
 
-Install the optional dependency:
+`SyntheticMacroEnv` is retained for unit tests, pipeline checks, and rapid
+experimentation. Its transitions are simulated and must not be represented as
+real StarCraft II data. `RealSC2MacroEnv` launches a configured local SC2 match
+through `burnysc2`, extracts only BotAI-visible state, and is the path for
+final world-model and real-environment RL data collection.
+
+Install the optional dependency and ensure StarCraft II plus the requested map
+are installed locally (do not hard-code either path in this repository):
 
 ```powershell
-python -m pip install .[sc2]
+python -m pip install "burnysc2>=6.6"
 ```
 
-Implement `RealSC2Backend` (`reset_game`, `execute_macro`, `get_action_mask`, and `close`) and provide it to `RealSC2MacroEnv`. The backend or existing bot owns the SC2 client lifecycle, building placement, unit selection, pathing, focus fire, and micro control. This project owns the macro-decision, state, reward, and trajectory contracts. Real execution also requires an authorized SC2 client, maps, and bot runtime; this repository never represents a synthetic match as a real SC2 result.
+The default `PythonSC2Backend` uses a dedicated game thread and queue bridge so
+the synchronous macro environment does not call `asyncio.run()` inside an
+existing event loop. It launches a builtin opponent from `configs/env/sc2.yaml`.
+For Ares or an existing BotAI runtime, implement the small `RealSC2Backend`
+protocol instead. The state adapter never queries hidden enemy state; enemy
+features use visible units, structures, and local scouting memory only.
+
+```powershell
+# Optional manual smoke test. This starts a real SC2 process, executes real
+# macro commands, saves a small replay buffer, and closes the client.
+python -m scripts.test_real_sc2_env --config configs/env/sc2.yaml --steps 20
+
+# Collect real trajectories with a mixed rule-based/random collector.
+python -m scripts.collect_real_sc2 --config configs/collect/real_sc2.yaml
+
+# Collect synthetic data for debugging or mixed pretraining.
+python -m scripts.collect_trajectories --config configs/collect/synthetic.yaml
+
+# Train only from real transitions, or pretrain using an explicit 80/20 mix.
+python -m scripts.train_world_model --config configs/train/world_model_real.yaml
+python -m scripts.train_world_model --config configs/train/world_model_mixed.yaml
+
+# Hybrid fine-tuning and fixed-opponent real-game evaluation.
+python -m scripts.train_hybrid --config configs/train/hybrid_real.yaml
+python -m scripts.evaluate_real_sc2 --config configs/eval/real_sc2.yaml
+```
+
+Every saved transition contains observation, action, reward, next observation,
+termination flags, current/next action masks, opponent identifiers, game loop,
+episode identifier, action execution metadata, and `environment_type`. The
+world model trains directly on recorded observation/action/next-observation,
+reward, and continuation fields. Generated replay files and checkpoints remain
+ignored by Git. Use a release or external artifact store for trained weights.
+
+The real smoke test is deliberately not part of ordinary CI: it requires a
+licensed local SC2 installation, compatible map, display/graphics setup, and
+the optional dependency. Confirm real provenance by checking replay metadata
+for `environment_type: real_sc2`, a non-synthetic map name, real game-loop
+values, and per-step command execution results.
 
 ## Tests
 

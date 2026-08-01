@@ -1,0 +1,5 @@
+env_config: configs/env/sc2.yaml
+checkpoint_path: outputs/checkpoints/hybrid_real.pt
+episodes: 20
+seed: 101
+device: auto

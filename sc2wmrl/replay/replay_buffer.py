@@ -14,7 +14,7 @@ from .transition import MacroTransition
 class ReplayBuffer:
     """Stores complete macro transitions and serializes them without pickle."""
 
-    FORMAT_VERSION = 1
+    FORMAT_VERSION = 2
 
     def __init__(self, capacity: int, *, seed: int = 0) -> None:
         if capacity <= 0:
@@ -68,9 +68,11 @@ class ReplayBuffer:
         observations = np.stack([item.observation for item in self._items])
         next_observations = np.stack([item.next_observation for item in self._items])
         masks = np.stack([item.action_mask for item in self._items])
+        next_masks = np.stack([item.next_action_mask for item in self._items])
         events = np.stack([item.events for item in self._items])
-        np.savez_compressed(path, observations=observations, next_observations=next_observations, action_masks=masks,
+        np.savez_compressed(path, observations=observations, next_observations=next_observations, action_masks=masks, next_action_masks=next_masks,
                             events=events, actions=np.asarray([item.action for item in self._items], dtype=np.int64),
+                            opponent_actions=np.asarray([item.opponent_action for item in self._items], dtype=np.int64),
                             rewards=np.asarray([item.reward for item in self._items], dtype=np.float32),
                             terminated=np.asarray([item.terminated for item in self._items], dtype=np.bool_),
                             truncated=np.asarray([item.truncated for item in self._items], dtype=np.bool_))
@@ -78,7 +80,7 @@ class ReplayBuffer:
                     "episode_ids": [item.episode_id for item in self._items], "game_loops": [item.game_loop for item in self._items],
                     "opponent_ids": [item.opponent_id for item in self._items], "opponent_types": [item.opponent_type for item in self._items],
                     "policy_versions": [item.policy_version for item in self._items], "map_names": [item.map_name for item in self._items],
-                    "infos": [item.info for item in self._items]}
+                    "environment_types": [item.environment_type for item in self._items], "infos": [item.info for item in self._items]}
         path.with_suffix(path.suffix + ".json").write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
 
     @classmethod
@@ -86,14 +88,19 @@ class ReplayBuffer:
         """Load a replay created by :meth:`save` and re-run all validations."""
         path = Path(path)
         metadata = json.loads(path.with_suffix(path.suffix + ".json").read_text(encoding="utf-8"))
-        if metadata.get("format_version") != cls.FORMAT_VERSION:
+        if metadata.get("format_version") not in {1, cls.FORMAT_VERSION}:
             raise ValueError("unsupported replay format version")
         with np.load(path, allow_pickle=False) as arrays:
             # Read each compressed member exactly once. Indexing an NpzFile inside
             # the loop repeatedly recreates a complete decompressed array; a row
             # view then keeps that whole array alive in every transition.
-            payload = {name: arrays[name] for name in ("observations", "next_observations", "action_masks", "events", "actions", "rewards", "terminated", "truncated")}
+            names = ("observations", "next_observations", "action_masks", "events", "actions", "rewards", "terminated", "truncated")
+            payload = {name: arrays[name] for name in names}
+            if "next_action_masks" in arrays.files: payload["next_action_masks"] = arrays["next_action_masks"]
+            if "opponent_actions" in arrays.files: payload["opponent_actions"] = arrays["opponent_actions"]
             count = len(payload["actions"])
+            next_masks = payload.get("next_action_masks", payload["action_masks"])
+            opponent_actions = payload.get("opponent_actions", np.zeros(count, dtype=np.int64))
             buffer = cls(max(int(metadata["capacity"]), count), seed=seed)
             for index in range(count):
                 buffer.append(MacroTransition(
@@ -104,5 +111,7 @@ class ReplayBuffer:
                     opponent_type=metadata["opponent_types"][index], policy_version=metadata["policy_versions"][index],
                     map_name=metadata["map_names"][index], game_loop=int(metadata["game_loops"][index]),
                     events=payload["events"][index].copy(), info=metadata["infos"][index], episode_id=int(metadata["episode_ids"][index]),
+                    next_action_mask=next_masks[index].copy(), opponent_action=int(opponent_actions[index]),
+                    environment_type=metadata.get("environment_types", ["synthetic"] * count)[index],
                 ))
         return buffer
