@@ -17,6 +17,11 @@ class DynamicsEnsemble(nn.Module):
 
     def forward(self, feature: Tensor, action: Tensor, context: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """Return head features, rewards, continuations, each with leading ensemble axis."""
+        if feature.shape[:-1] != action.shape:
+            raise ValueError("ensemble feature/action sequence shapes must align")
+        while context.ndim < feature.ndim:
+            context = context.unsqueeze(1)
+        context = context.expand(*feature.shape[:-1], context.shape[-1])
         inputs = torch.cat([feature, self.action_embedding(action.long()), context], dim=-1)
         values = torch.stack([head(inputs) for head in self.heads], dim=0)
         return values[..., :-2], values[..., -2], torch.sigmoid(values[..., -1])

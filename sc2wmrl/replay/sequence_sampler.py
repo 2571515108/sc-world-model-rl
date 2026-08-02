@@ -14,28 +14,40 @@ class SequenceSampler:
     def __init__(self, replay: ReplayBuffer, *, seed: int = 0) -> None:
         self.replay = replay
         self._rng = np.random.default_rng(seed)
+        self._cache: dict[tuple[int, int], np.ndarray] = {}
+        self.index_builds = 0
+
+    def _valid_starts(self, total: int) -> np.ndarray:
+        """Build legal episode-local sequence starts once per replay version."""
+        key = (self.replay.version, total)
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        items = self.replay.items_view()
+        starts: list[int] = []
+        for start in range(0, len(items) - total + 1):
+            first = items[start]
+            valid = True
+            for index in range(start, start + total - 1):
+                current, following = items[index], items[index + 1]
+                if current.episode_id != first.episode_id or following.episode_id != first.episode_id or following.game_loop <= current.game_loop or not np.array_equal(current.next_observation, following.observation):
+                    valid = False; break
+            if valid:
+                starts.append(start)
+        self._cache = {key: np.asarray(starts, dtype=np.int64)}
+        self.index_builds += 1
+        return self._cache[key]
 
     def sample(self, batch_size: int, sequence_length: int, burn_in_length: int = 0) -> list[list[MacroTransition]]:
         """Return fixed-length sequences that never cross episode boundaries."""
         if batch_size <= 0 or sequence_length <= 0 or burn_in_length < 0:
             raise ValueError("invalid sequence sampling parameters")
         total = sequence_length + burn_in_length
-        items = self.replay.transitions()
-        starts: list[int] = []
-        for start in range(0, len(items) - total + 1):
-            chunk = items[start:start + total]
-            same_episode = all(item.episode_id == chunk[0].episode_id for item in chunk)
-            contiguous = all(
-                chunk[i + 1].game_loop > chunk[i].game_loop
-                and np.array_equal(chunk[i].next_observation, chunk[i + 1].observation)
-                for i in range(len(chunk) - 1)
-            )
-            if same_episode and contiguous:
-                starts.append(start)
+        starts = self._valid_starts(total)
         if batch_size > len(starts):
             raise ValueError("not enough continuous replay sequences")
         choices = self._rng.choice(starts, size=batch_size, replace=False)
-        return [list(items[int(start):int(start) + total]) for start in choices]
+        return [[self.replay[index] for index in range(int(start), int(start) + total)] for start in choices]
 
 
 class MixedSequenceSampler:

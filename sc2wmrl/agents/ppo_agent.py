@@ -74,11 +74,23 @@ class PPOAgent:
         mask = np.asarray(action_mask, dtype=np.bool_)
         if observation.shape != (self.observation_dim,) or mask.shape != (ACTION_COUNT,) or not mask.any() or not np.isfinite(observation).all():
             raise ValueError("invalid PPO action input")
-        with torch.no_grad():
-            distribution, value = self._distribution(torch.as_tensor(observation[None], device=self.device), torch.as_tensor(mask[None], device=self.device))
-            action = torch.argmax(distribution.logits, dim=-1) if deterministic else distribution.sample()
-            log_prob = distribution.log_prob(action)
-        return int(action.item()), float(log_prob.item()), float(value.item())
+        actions, log_probs, values = self.act_batch(observation[None], mask[None], deterministic=deterministic)
+        return int(actions[0]), float(log_probs[0]), float(values[0])
+
+    def act_batch(self, observations: np.ndarray, action_masks: np.ndarray, *, deterministic: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Infer many mask-respecting actions in one device call.
+
+        Vector collectors use this method to avoid thousands of batch-one CUDA
+        launches; the scalar :meth:`act` API remains fully compatible.
+        """
+        torch = _torch(); observations = np.asarray(observations, dtype=np.float32); masks = np.asarray(action_masks, dtype=np.bool_)
+        if observations.ndim != 2 or observations.shape[1] != self.observation_dim or masks.shape != (len(observations), ACTION_COUNT) or not masks.any(-1).all() or not np.isfinite(observations).all():
+            raise ValueError("invalid PPO batch action input")
+        with torch.inference_mode():
+            distribution, values = self._distribution(torch.as_tensor(observations, device=self.device), torch.as_tensor(masks, device=self.device))
+            actions = distribution.probs.argmax(-1) if deterministic else distribution.sample()
+            log_probs = distribution.log_prob(actions)
+        return actions.cpu().numpy().astype(np.int64), log_probs.cpu().numpy().astype(np.float32), values.cpu().numpy().astype(np.float32)
 
     def update(self, batch: dict[str, np.ndarray]) -> dict[str, float]:
         """Run clipped PPO updates on validated rollout data."""

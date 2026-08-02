@@ -29,6 +29,7 @@ class SyntheticEnvConfig:
     map_width: float = 200.0
     map_height: float = 200.0
     opponent: str = "economy_bot"
+    info_mode: str = "minimal"
     reward: RewardConfig = field(default_factory=RewardConfig)
 
     def __post_init__(self) -> None:
@@ -36,6 +37,8 @@ class SyntheticEnvConfig:
             raise ValueError("macro interval and maximum steps must be positive")
         if self.opponent not in {f"{name}_bot" for name in STRATEGIES if name != "unknown"} | {"randomized_bot"}:
             raise ValueError(f"unknown scripted opponent {self.opponent!r}")
+        if self.info_mode not in {"minimal", "full"}:
+            raise ValueError("info mode must be minimal or full")
 
 
 class SyntheticMacroEnv(MacroSC2Env):
@@ -252,7 +255,9 @@ class SyntheticMacroEnv(MacroSC2Env):
     def _info(self, additional: dict[str, Any]) -> InfoDict:
         info: InfoDict = {"action_mask": self.get_action_mask().copy(), "opponent_id": self.config.opponent,
                           "opponent_type": "scripted", "game_loop": self._state["game_time"], "step": self._steps,
-                          "raw_state": deepcopy(self._state), "enemy_strategy": self._enemy["strategy"], "opponent_action": self._enemy["last_action"]}
+                          "environment_type": "synthetic", "enemy_strategy": self._enemy["strategy"], "opponent_action": self._enemy["last_action"]}
+        if self.config.info_mode == "full":
+            info["raw_state"] = deepcopy(self._state)
         info.update(additional)
         return info
 

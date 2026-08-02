@@ -40,7 +40,7 @@ class HybridTrainer:
             sequences = self.sampler.sample(self.config.imagined_batch_size, self.config.imagined_sequence_length)
             batch = sequence_batch(sequences, str(next(self.imagination.actor.parameters()).device))
             masks = torch.as_tensor(np.stack([[item.action_mask for item in seq] for seq in sequences]), device=batch["observations"].device)
-            imagined = self.imagination.rollout(batch["observations"], batch["actions"], masks, batch["opponent_ids"])
+            imagined = self.imagination.rollout(batch["observations"], batch["actions"], masks, batch["opponent_ids"], batch["next_observations"])
             result.update({key: weight * value for key, value in self.imagination.update(imagined).items()})
             # Distill the imagined latent actor's first decision into the deployed
             # observation policy, so imagination changes the PPO checkpoint rather

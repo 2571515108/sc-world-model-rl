@@ -13,5 +13,6 @@ learning_rate: 0.0002
 max_grad_norm: 100.0
 seed: 7
 device: auto
+precision: bf16-mixed
 validation_fraction: 0.1
 validation_interval: 100

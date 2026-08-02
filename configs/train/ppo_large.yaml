@@ -1,0 +1,11 @@
+env_config: configs/env/synthetic_diverse.yaml
+ppo_config: configs/model/ppo_large.yaml
+seed: 0
+device: cuda
+episodes: 10000
+rollout_steps: 4096
+evaluation_episodes: 100
+evaluation_interval_steps: 50000
+checkpoint_interval_steps: 50000
+record_training_replay: false
+checkpoint_path: outputs/checkpoints/ppo_large.pt

@@ -39,30 +39,36 @@ class Rollout:
 class PPOTrainer:
     """Phase 1 trainer that keeps real trajectory storage and PPO data distinct."""
 
-    def __init__(self, env: MacroSC2Env, agent: PPOAgent, replay: ReplayBuffer, *, policy_version: str = "ppo-v1") -> None:
+    def __init__(self, env: MacroSC2Env, agent: PPOAgent, replay: ReplayBuffer | None = None, *, policy_version: str = "ppo-v1") -> None:
         if env.observation_dim != agent.observation_dim:
             raise ValueError("environment and PPO observation dimensions differ")
         self.env, self.agent, self.replay, self.policy_version = env, agent, replay, policy_version
         self._episode_id = 0
+        self._current_observation: np.ndarray | None = None
+        self._current_info: dict[str, Any] | None = None
 
     def collect(self, rollout_steps: int, *, seed: int | None = None) -> Rollout:
         """Collect mask-respecting real transitions until an exact step budget is met."""
         if rollout_steps <= 0: raise ValueError("rollout steps must be positive")
-        observation, info = self.env.reset(seed=seed); episode_id = self._episode_id
+        if self._current_observation is None or self._current_info is None:
+            self._current_observation, self._current_info = self.env.reset(seed=seed)
+        observation, info, episode_id = self._current_observation, self._current_info, self._episode_id
         records: dict[str, list[Any]] = {key: [] for key in ("observations", "masks", "actions", "log_probs", "rewards", "values", "dones")}
         for _ in range(rollout_steps):
             mask = np.asarray(info["action_mask"], dtype=np.bool_); action, log_prob, value = self.agent.act(observation, mask)
             next_observation, reward, terminated, truncated, next_info = self.env.step(action)
-            self.replay.append(MacroTransition(observation=observation, entity_observation=None, action=action, action_mask=mask, reward=reward,
+            if self.replay is not None: self.replay.append(MacroTransition(observation=observation, entity_observation=None, action=action, action_mask=mask, reward=reward,
                                                terminated=terminated, truncated=truncated, next_observation=next_observation,
                                                opponent_id=str(info.get("opponent_id", "unknown")), opponent_type=str(info.get("opponent_type", "unknown")),
                                                policy_version=self.policy_version, map_name=str(info.get("map_name", "synthetic")), game_loop=int(info.get("game_loop", 0)),
-                                               events=np.zeros(7, dtype=np.float32), info={"reward_components": next_info.get("reward_components", {}), "opponent_action": next_info.get("opponent_action", 0), "enemy_strategy": next_info.get("enemy_strategy", "unknown")}, episode_id=episode_id))
+                                               events=np.zeros(7, dtype=np.float32), info={"reward_components": next_info.get("reward_components", {}), "opponent_action": next_info.get("opponent_action", 0), "enemy_strategy": next_info.get("enemy_strategy", "unknown")}, episode_id=episode_id,
+                                               next_action_mask=np.asarray(next_info["action_mask"], dtype=np.bool_), opponent_action=int(next_info.get("opponent_action", 0)), environment_type=str(next_info.get("environment_type", "synthetic"))))
             for key, value_item in (("observations", observation), ("masks", mask), ("actions", action), ("log_probs", log_prob), ("rewards", reward), ("values", value), ("dones", terminated or truncated)):
                 records[key].append(value_item)
             observation, info = next_observation, next_info
             if terminated or truncated:
                 self._episode_id += 1; episode_id = self._episode_id; observation, info = self.env.reset()
+        self._current_observation, self._current_info = observation, info
         return Rollout(**records, last_observation=observation, last_mask=np.asarray(info["action_mask"], dtype=np.bool_))
 
     def update(self, rollout: Rollout) -> dict[str, float]:
@@ -82,4 +88,5 @@ class PPOTrainer:
                 action, _, _ = self.agent.act(observation, info["action_mask"], deterministic=True)
                 observation, reward, terminated, truncated, info = self.env.step(action); total += reward; done = terminated or truncated
             returns.append(total); wins += int(info.get("outcome") == "win")
+        self._current_observation, self._current_info = None, None
         return {"mean_return": float(np.mean(returns)), "win_rate": wins / episodes, "episodes": float(episodes)}

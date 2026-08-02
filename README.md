@@ -82,6 +82,29 @@ All rewards, model sizes, rollout horizons, uncertainty thresholds, and training
 
 The implementation guarantees executable training and metrics code but does not fabricate research claims. Run controlled experiments with the same seed, opponent pool, and real-interaction budget before claiming sample-efficiency or win-rate improvements.
 
+## Training Efficiency
+
+World-model checkpoints now use format version 2. They are transition-aligned:
+each `action_t` predicts `next_observation_t`, `reward_t`, continuation, the
+next action mask, and trained ensemble targets. Format-1 world-model weights
+are intentionally rejected because their time alignment was different.
+
+For large offline replay, set `use_array_replay: true`; it avoids rebuilding
+Python transition objects for each update and caches episode-contiguous starts.
+`burn_in_length` initializes the RSSM state under no-grad and excludes the
+prefix from loss. On CUDA, use `precision: bf16-mixed` on hardware that
+supports bfloat16. PPO can leave `record_training_replay: false` because its
+on-policy rollout is not required for PPO updates.
+
+```powershell
+python -m scripts.benchmark_training --replay outputs/replays/diverse_seed0.npz --batch-size 32 --sequence-length 64 --burn-in-length 16 --device cuda
+python -m scripts.train_world_model --config configs/train/world_model_large.yaml
+```
+
+The benchmark reports replay-index build time, cached sampling time, and PPO
+batch inference time. Compare runs on the same machine and replay rather than
+using GPU utilization alone to infer bottlenecks.
+
 ## Real SC2 Integration
 
 `SyntheticMacroEnv` is retained for unit tests, pipeline checks, and rapid

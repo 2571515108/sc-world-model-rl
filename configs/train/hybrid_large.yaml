@@ -1,0 +1,16 @@
+env_config: configs/env/synthetic_diverse.yaml
+ppo_config: configs/model/ppo_large.yaml
+world_model_checkpoint: outputs/checkpoints/world_model_large.pt
+policy_checkpoint: outputs/checkpoints/ppo_large.pt
+checkpoint_path: outputs/checkpoints/hybrid_large.pt
+replay_path: outputs/replays/diverse_seed0.npz
+updates: 500
+rollout_steps: 2048
+imagination_weight_max: 0.5
+imagination_warmup_updates: 100
+imagined_batch_size: 32
+imagined_sequence_length: 32
+imagination_horizon: 15
+uncertainty_threshold: 1.0
+seed: 0
+device: cuda

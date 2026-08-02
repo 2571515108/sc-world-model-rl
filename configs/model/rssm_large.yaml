@@ -1,0 +1,10 @@
+deterministic_dim: 512
+stochastic_dim: 128
+action_embedding_dim: 64
+opponent_embedding_dim: 64
+hidden_dim: 512
+ensemble_size: 5
+event_dim: 7
+opponent_count: 128
+kl_free_nats: 1.0
+kl_balance: 0.8

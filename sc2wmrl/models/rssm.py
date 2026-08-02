@@ -60,6 +60,22 @@ class RSSM(nn.Module):
         posterior = RSSMState(prior.deter, self._sample(mean, std, sample), mean, std)
         return prior, posterior
 
+    def initial_posterior(self, observation_embed: Tensor, sample: bool = True) -> RSSMState:
+        """Infer the latent state for the initial observed state without an action."""
+        initial = self.initial(observation_embed.shape[0], observation_embed.device)
+        mean, std = self._stats(self.posterior_net(torch.cat([initial.deter, observation_embed], dim=-1)))
+        return RSSMState(initial.deter, self._sample(mean, std, sample), mean, std)
+
+    def posterior_from_prior(self, prior: RSSMState, observation_embed: Tensor, sample: bool = True) -> RSSMState:
+        """Condition an action-advanced prior on the corresponding next observation."""
+        mean, std = self._stats(self.posterior_net(torch.cat([prior.deter, observation_embed], dim=-1)))
+        return RSSMState(prior.deter, self._sample(mean, std, sample), mean, std)
+
+    @staticmethod
+    def detach(state: RSSMState) -> RSSMState:
+        """Detach all recurrent tensors at a burn-in boundary."""
+        return RSSMState(state.deter.detach(), state.stoch.detach(), state.mean.detach(), state.std.detach())
+
     def feature(self, state: RSSMState) -> Tensor:
         """Concatenate latent components for decoder/prediction heads."""
         return torch.cat([state.deter, state.stoch], dim=-1)

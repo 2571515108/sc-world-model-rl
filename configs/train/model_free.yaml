@@ -6,3 +6,6 @@ episodes: 400
 rollout_steps: 1024
 evaluation_episodes: 32
 checkpoint_path: outputs/checkpoints/ppo_synthetic.pt
+record_training_replay: false
+evaluation_interval_steps: 50000
+checkpoint_interval_steps: 50000

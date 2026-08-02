@@ -23,6 +23,7 @@ class ReplayBuffer:
         self._items: list[MacroTransition] = []
         self._observation_shape: tuple[int, ...] | None = None
         self._rng = np.random.default_rng(seed)
+        self._version = 0
 
     def __len__(self) -> int:
         return len(self._items)
@@ -31,6 +32,19 @@ class ReplayBuffer:
     def observation_shape(self) -> tuple[int, ...] | None:
         """Observation shape fixed by the first inserted transition."""
         return self._observation_shape
+
+    @property
+    def version(self) -> int:
+        """Monotonic mutation counter used to invalidate sampler indexes."""
+        return self._version
+
+    def __getitem__(self, index: int) -> MacroTransition:
+        """Read a transition without constructing a full replay snapshot."""
+        return self._items[index]
+
+    def items_view(self) -> tuple[MacroTransition, ...]:
+        """Immutable sequence view retained for compatibility with old callers."""
+        return tuple(self._items)
 
     def append(self, transition: MacroTransition) -> None:
         """Insert a transition while preserving fixed dimensionality."""
@@ -42,6 +56,7 @@ class ReplayBuffer:
         if len(self._items) >= self.capacity:
             self._items.pop(0)
         self._items.append(transition)
+        self._version += 1
 
     def extend(self, transitions: Iterable[MacroTransition]) -> None:
         """Append transitions in order, preserving episode contiguity."""
@@ -57,7 +72,7 @@ class ReplayBuffer:
 
     def transitions(self) -> tuple[MacroTransition, ...]:
         """Read-only ordered transition snapshot."""
-        return tuple(self._items)
+        return self.items_view()
 
     def save(self, path: str | Path) -> None:
         """Persist numeric tensors to NPZ and metadata to a JSON sidecar."""

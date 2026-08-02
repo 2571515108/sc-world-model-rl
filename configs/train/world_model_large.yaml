@@ -1,0 +1,15 @@
+replay_path: outputs/replays/diverse_seed0.npz
+model_config: configs/model/rssm_large.yaml
+checkpoint_path: outputs/checkpoints/world_model_large.pt
+updates: 5000
+batch_size: 32
+sequence_length: 64
+burn_in_length: 16
+learning_rate: 0.0002
+max_grad_norm: 100.0
+seed: 0
+device: cuda
+use_array_replay: true
+validate_replay_on_index_build: true
+precision: bf16-mixed
+prefetch_batches: 2

@@ -34,24 +34,28 @@ class ImaginationTrainer:
         self.world_model, self.actor, self.critic, self.config = world_model, actor.to(device), critic.to(device), config or ImaginationConfig()
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.config.learning_rate)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.config.learning_rate)
+        self.world_model.requires_grad_(False)
 
-    def rollout(self, observations: Tensor, actions: Tensor, action_masks: Tensor, opponent_ids: Tensor | None = None) -> dict[str, Tensor]:
+    def rollout(self, observations: Tensor, actions: Tensor, action_masks: Tensor, opponent_ids: Tensor | None = None, next_observations: Tensor | None = None) -> dict[str, Tensor]:
         """Start at posterior states and stop each trajectory on uncertainty/terminal anomalies."""
         self.world_model.eval()
         with torch.no_grad():
-            _, posts, context, _ = self.world_model.observe(observations, actions, opponent_ids, sample=False)
+            _, posts, context, _ = self.world_model.observe(observations, actions, opponent_ids, next_observations=next_observations, sample=False)
         state: RSSMState = posts[-1]; mask = action_masks[:, -1].bool()
         if not torch.all(mask.any(-1)): raise ValueError("imagination start contains empty masks")
         features: list[Tensor] = []; sampled_actions: list[Tensor] = []; log_probs: list[Tensor] = []; rewards: list[Tensor] = []; continues: list[Tensor] = []; alive: list[Tensor] = []; entropies: list[Tensor] = []
         active = torch.ones(observations.shape[0], dtype=torch.bool, device=observations.device)
         for _ in range(self.config.horizon):
             feature = self.world_model.rssm.feature(state).detach(); distribution = self.actor.distribution(feature, mask)
-            action = distribution.sample(); next_state, reward, continuation, uncertainty, _ = self.world_model.imagine_step(state, action, context)
+            action = distribution.sample()
+            with torch.no_grad():
+                next_state, reward, continuation, uncertainty = self.world_model.imagine_step(state, action, context)
+                next_mask = self.world_model.imagined_action_mask(self.world_model.rssm.feature(next_state))
             valid = torch.isfinite(reward) & torch.isfinite(uncertainty) & torch.isfinite(continuation) & (uncertainty <= self.config.uncertainty_threshold) & (continuation > 0.5) & mask.any(-1)
             active = active & valid
             features.append(feature); sampled_actions.append(action); log_probs.append(distribution.log_prob(action)); entropies.append(distribution.entropy())
             rewards.append((reward - self.config.pessimism_scale * uncertainty) * active.float()); continues.append(continuation * active.float()); alive.append(active.float())
-            state = next_state
+            state, mask = next_state, next_mask
             if not active.any(): break
         if not rewards: raise RuntimeError("imagination produced no rollout steps")
         return {"features": torch.stack(features, 1), "actions": torch.stack(sampled_actions, 1), "log_probs": torch.stack(log_probs, 1),
