@@ -1,0 +1,30 @@
+# Shared-policy curriculum: synthetic macro practice first, then real SC2.
+synthetic_env_config: configs/env/synthetic.yaml
+real_env_config: configs/env/sc2.yaml
+
+# The imagination sampler keeps real data dominant while retaining transfer breadth.
+synthetic_replay_path: outputs/replays/synthetic_quality.npz
+real_replay_path: outputs/replays/real_quality.npz
+imagination_synthetic_ratio: 0.3
+
+world_model_checkpoint: outputs/checkpoints/world_model_quality_mixed.pt
+# Start from a trained real PPO policy; optimizer state is restored as well.
+policy_checkpoint: outputs/checkpoints/ppo_real_reboot.pt
+checkpoint_path: outputs/checkpoints/hybrid_curriculum.pt
+
+# Each update contains exactly this many on-policy macro steps, divided by the curriculum.
+rollout_steps: 128
+updates: 40
+real_ratio_start: 0.15
+real_ratio_end: 0.75
+real_ratio_warmup_updates: 25
+
+imagination_weight_max: 0.25
+imagination_warmup_updates: 10
+imagined_batch_size: 8
+imagined_sequence_length: 16
+imagination_horizon: 10
+uncertainty_threshold: 0.75
+
+seed: 7
+device: cuda

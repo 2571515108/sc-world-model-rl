@@ -1,0 +1,9 @@
+replay_paths:
+  - outputs/replays/synthetic_quality.npz
+  - outputs/replays/real_quality.npz
+ppo_config: configs/model/ppo.yaml
+checkpoint_path: outputs/checkpoints/ppo_behavior_bootstrap.pt
+epochs: 20
+batch_size: 256
+seed: 7
+device: cuda

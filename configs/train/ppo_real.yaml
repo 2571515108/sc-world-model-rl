@@ -1,0 +1,15 @@
+# Conservative real-SC2 online PPO configuration. Increase updates only after
+# verifying trajectory quality and checkpoint metrics from this pilot run.
+env_config: configs/env/sc2.yaml
+ppo_config: configs/model/ppo.yaml
+seed: 7
+device: cuda
+updates: 20
+rollout_steps: 128
+evaluation_episodes: 2
+evaluation_interval_steps: 640
+checkpoint_interval_steps: 640
+record_training_replay: true
+replay_capacity: 8192
+training_replay_path: outputs/replays/ppo_real_online.npz
+checkpoint_path: outputs/checkpoints/ppo_real.pt

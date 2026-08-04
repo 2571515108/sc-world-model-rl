@@ -24,6 +24,7 @@ def action_mask(state: Mapping[str, Any]) -> np.ndarray:
     b = state.get("buildings", {})
     available = state.get("available", {})
     pending = state.get("pending_actions", {})
+    supply_depots = int(b.get("supply_depot", 0))
     barracks, factory, starport = int(b.get("barracks", 0)), int(b.get("factory", 0)), int(b.get("starport", 0))
     refiners, upgrades = int(b.get("refinery", 0)), state.get("completed_upgrade_flags", [])
     mask = np.zeros(ACTION_COUNT, dtype=np.bool_)
@@ -35,7 +36,8 @@ def action_mask(state: Mapping[str, Any]) -> np.ndarray:
     def ready(action: MacroAction) -> bool: return not bool(pending.get(action.name, False))
     mask[MacroAction.TRAIN_WORKERS] = minerals >= 50 and workers < min(80, supply_cap) and bases > 0 and bool(available.get("command_center", bases > 0)) and ready(MacroAction.TRAIN_WORKERS)
     mask[MacroAction.BUILD_SUPPLY] = minerals >= 100 and supply_cap < 200 and idle_worker and ready(MacroAction.BUILD_SUPPLY)
-    mask[MacroAction.BUILD_BARRACKS] = minerals >= 150 and idle_worker and ready(MacroAction.BUILD_BARRACKS)
+    completed_supply_depot = bool(available.get("supply_depot", supply_depots > 0))
+    mask[MacroAction.BUILD_BARRACKS] = minerals >= 150 and completed_supply_depot and idle_worker and ready(MacroAction.BUILD_BARRACKS)
     mask[MacroAction.BUILD_REFINERY] = minerals >= 75 and refiners < bases * 2 and idle_worker and ready(MacroAction.BUILD_REFINERY)
     mask[MacroAction.BUILD_FACTORY] = minerals >= 150 and vespene >= 100 and barracks > 0 and idle_worker and ready(MacroAction.BUILD_FACTORY)
     mask[MacroAction.BUILD_STARPORT] = minerals >= 150 and vespene >= 100 and factory > 0 and idle_worker and ready(MacroAction.BUILD_STARPORT)
@@ -43,7 +45,16 @@ def action_mask(state: Mapping[str, Any]) -> np.ndarray:
     mask[MacroAction.TRAIN_BASIC_ARMY] = minerals >= 50 and supply < supply_cap and idle_barracks and ready(MacroAction.TRAIN_BASIC_ARMY)
     mask[MacroAction.TRAIN_ANTI_GROUND] = minerals >= 100 and vespene >= 25 and supply < supply_cap and idle_barracks and ready(MacroAction.TRAIN_ANTI_GROUND)
     mask[MacroAction.TRAIN_ANTI_AIR] = minerals >= 100 and vespene >= 100 and supply < supply_cap and idle_starport and ready(MacroAction.TRAIN_ANTI_AIR)
-    mask[MacroAction.RESEARCH_UPGRADE] = minerals >= 100 and vespene >= 100 and (idle_barracks or idle_factory) and not all(upgrades) and ready(MacroAction.RESEARCH_UPGRADE)
+    # The current Terran macro vocabulary researches infantry weapons at an
+    # Engineering Bay.  Checking a Barracks or Factory here made the action
+    # appear legal even though the raw command had no valid producer.
+    engineering_bays = int(b.get("engineering_bay", 0))
+    idle_engineering_bay = bool(available.get("engineering_bay", engineering_bays > 0))
+    # One stable macro action owns the complete upgrade skill: it first
+    # establishes an Engineering Bay, then researches when it is idle.
+    can_start_upgrade_facility = engineering_bays == 0 and minerals >= 150 and idle_worker
+    can_research = minerals >= 100 and vespene >= 100 and idle_engineering_bay and (not upgrades or not all(upgrades))
+    mask[MacroAction.RESEARCH_UPGRADE] = (can_start_upgrade_facility or can_research) and ready(MacroAction.RESEARCH_UPGRADE)
     has_scout = bool(available.get("scout", workers > 0 or army > 0))
     mask[MacroAction.SCOUT_ENEMY_MAIN] = has_scout and ready(MacroAction.SCOUT_ENEMY_MAIN)
     mask[MacroAction.SCOUT_EXPANSION] = has_scout and ready(MacroAction.SCOUT_EXPANSION)

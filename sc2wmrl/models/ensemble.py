@@ -16,7 +16,7 @@ class DynamicsEnsemble(nn.Module):
         self.heads = nn.ModuleList([nn.Sequential(nn.Linear(input_dim, hidden_dim), nn.ELU(), nn.Linear(hidden_dim, feature_dim + 2)) for _ in range(ensemble_size)])
 
     def forward(self, feature: Tensor, action: Tensor, context: Tensor) -> tuple[Tensor, Tensor, Tensor]:
-        """Return head features, rewards, continuations, each with leading ensemble axis."""
+        """Return head features, rewards, continuation logits with ensemble axis."""
         if feature.shape[:-1] != action.shape:
             raise ValueError("ensemble feature/action sequence shapes must align")
         while context.ndim < feature.ndim:
@@ -24,7 +24,7 @@ class DynamicsEnsemble(nn.Module):
         context = context.expand(*feature.shape[:-1], context.shape[-1])
         inputs = torch.cat([feature, self.action_embedding(action.long()), context], dim=-1)
         values = torch.stack([head(inputs) for head in self.heads], dim=0)
-        return values[..., :-2], values[..., -2], torch.sigmoid(values[..., -1])
+        return values[..., :-2], values[..., -2], values[..., -1]
 
     def disagreement(self, feature: Tensor, action: Tensor, context: Tensor) -> Tensor:
         """Scalar predictive disagreement per batch element."""

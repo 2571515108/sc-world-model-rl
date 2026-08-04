@@ -104,7 +104,8 @@ class WorldModel(nn.Module):
 
     def loss(self, observations: Tensor, next_observations: Tensor, actions: Tensor, rewards: Tensor, continues: Tensor, events: Tensor,
              next_action_masks: Tensor | None = None, opponent_actions: Tensor | None = None, opponent_ids: Tensor | None = None,
-             strategy_targets: Tensor | None = None, mask: Tensor | None = None, burn_in_length: int = 0) -> WorldModelLoss:
+             strategy_targets: Tensor | None = None, opponent_action_valid: Tensor | None = None,
+             mask: Tensor | None = None, burn_in_length: int = 0) -> WorldModelLoss:
         """Compute masked losses; burn-in updates state but has no gradient/loss."""
         priors, posteriors, context, strategy_logits = self.observe(observations, actions, opponent_ids, next_observations=next_observations, burn_in_length=burn_in_length)
         features = torch.stack([self.rssm.feature(state) for state in posteriors], dim=1)
@@ -119,8 +120,21 @@ class WorldModel(nn.Module):
         reward_loss = avg(F.mse_loss(self.reward_head(features).squeeze(-1), rewards, reduction="none"))
         continuation_loss = avg(F.binary_cross_entropy_with_logits(self.continue_head(features).squeeze(-1), continues, reduction="none"))
         event_loss = avg(F.binary_cross_entropy_with_logits(self.event_head(features), events, reduction="none").mean(-1))
-        target_actions = actions if opponent_actions is None else opponent_actions
-        opponent_loss = avg(F.cross_entropy(self.opponent_action_head(features).transpose(1, 2), target_actions.long(), reduction="none"))
+        if opponent_actions is None:
+            opponent_loss = features.sum() * 0.0
+        else:
+            if opponent_actions.shape != observations.shape[:2]:
+                raise ValueError("opponent actions must have shape [B,T]")
+            valid = torch.ones_like(mask, dtype=torch.bool) if opponent_action_valid is None else opponent_action_valid.bool()
+            if valid.shape != observations.shape[:2]:
+                raise ValueError("opponent action validity must have shape [B,T]")
+            opponent_mask = mask * valid.float()
+            denominator = opponent_mask.sum()
+            if denominator <= 0:
+                opponent_loss = features.sum() * 0.0
+            else:
+                values = F.cross_entropy(self.opponent_action_head(features).transpose(1, 2), opponent_actions.long(), reduction="none")
+                opponent_loss = (values * opponent_mask).sum() / denominator
         if strategy_targets is not None:
             if strategy_targets.shape != (observations.shape[0],): raise ValueError("strategy targets must have shape [B]")
             opponent_loss = opponent_loss + F.cross_entropy(strategy_logits, strategy_targets.long())
@@ -130,12 +144,12 @@ class WorldModel(nn.Module):
             prior_detached = RSSMState(prior.deter, prior.stoch, prior.mean.detach(), prior.std.detach())
             balanced_kl.append(self.config.kl_balance * self.rssm.kl(post_detached, prior) + (1 - self.config.kl_balance) * self.rssm.kl(post, prior_detached))
         kl = avg(torch.maximum(torch.stack(balanced_kl, dim=1), torch.full_like(mask, self.config.kl_free_nats)))
-        predicted_features, predicted_rewards, predicted_continues = self.ensemble(source_features, actions, context)
+        predicted_features, predicted_rewards, predicted_continue_logits = self.ensemble(source_features, actions, context)
         bootstrap = torch.rand(predicted_features.shape[:3], device=features.device) < 0.5
         target_feature = features.detach().unsqueeze(0).expand_as(predicted_features)
         ensemble_mask = bootstrap.float() * mask.unsqueeze(0)
         denom = ensemble_mask.sum().clamp_min(1.0)
-        ensemble = (((predicted_features - target_feature).pow(2).mean(-1) + (predicted_rewards - rewards.unsqueeze(0)).pow(2) + F.binary_cross_entropy(predicted_continues, continues.unsqueeze(0).expand_as(predicted_continues), reduction="none")) * ensemble_mask).sum() / denom
+        ensemble = (((predicted_features - target_feature).pow(2).mean(-1) + (predicted_rewards - rewards.unsqueeze(0)).pow(2) + F.binary_cross_entropy_with_logits(predicted_continue_logits, continues.unsqueeze(0).expand_as(predicted_continue_logits), reduction="none")) * ensemble_mask).sum() / denom
         if next_action_masks is None:
             action_mask_loss = torch.zeros((), device=features.device)
         else:

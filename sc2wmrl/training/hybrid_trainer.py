@@ -32,9 +32,19 @@ class HybridTrainer:
         """Return a deterministic linear warmup weight capped by configuration."""
         return self.config.imagination_weight_max * min(1.0, self.updates / max(1, self.config.imagination_warmup_updates))
 
-    def update(self, rollout: Rollout) -> dict[str, float]:
-        """Perform one real PPO update and conditionally one imagined update."""
-        result = {f"real_{key}": value for key, value in self.ppo.update(rollout).items()}; weight = self.imagination_weight()
+    def update(self, rollout: Rollout | list[tuple[str, PPOTrainer, Rollout]]) -> dict[str, float]:
+        """Update a shared PPO policy from one or more on-policy environments.
+
+        A list lets the curriculum alternate real and synthetic rollouts while
+        preserving PPO's on-policy update rule for every source independently.
+        """
+        entries = [("real", self.ppo, rollout)] if isinstance(rollout, Rollout) else rollout
+        if not entries:
+            raise ValueError("hybrid update requires at least one rollout")
+        result: dict[str, float] = {}
+        for source, trainer, source_rollout in entries:
+            result.update({f"{source}_{key}": value for key, value in trainer.update(source_rollout).items()})
+        weight = self.imagination_weight()
         result["imagination_weight"] = weight
         if weight > 0:
             sequences = self.sampler.sample(self.config.imagined_batch_size, self.config.imagined_sequence_length)

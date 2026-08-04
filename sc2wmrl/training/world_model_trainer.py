@@ -26,12 +26,15 @@ def sequence_batch(sequences: list[list[object]], device: str = "cpu") -> dict[s
     continues = np.asarray([[not (item.terminated or item.truncated) for item in sequence] for sequence in sequences], dtype=np.float32)
     events = np.stack([[item.events for item in sequence] for sequence in sequences])
     opponent_actions = np.asarray([[int(item.opponent_action) for item in sequence] for sequence in sequences], dtype=np.int64)
+    opponent_action_valid = np.asarray([[bool(item.opponent_action_valid) for item in sequence] for sequence in sequences], dtype=np.bool_)
     strategy_ids = {"rush": 0, "economy": 1, "defensive": 2, "ground_tech": 3, "air_tech": 4, "unknown": 5}
     strategies = np.asarray([strategy_ids.get(str(sequence[0].info.get("enemy_strategy", "unknown")).removesuffix("_bot"), 5) for sequence in sequences], dtype=np.int64)
     opponent_ids = np.asarray([zlib.crc32(sequence[0].opponent_id.encode()) % 128 for sequence in sequences], dtype=np.int64)
     return {"observations": torch.as_tensor(observations, device=device), "next_observations": torch.as_tensor(next_observations, device=device), "next_action_masks": torch.as_tensor(next_action_masks, device=device), "actions": torch.as_tensor(actions, device=device),
             "rewards": torch.as_tensor(rewards, device=device), "continues": torch.as_tensor(continues, device=device),
-            "events": torch.as_tensor(events, device=device), "opponent_actions": torch.as_tensor(opponent_actions, device=device), "opponent_ids": torch.as_tensor(opponent_ids, device=device), "strategy_targets": torch.as_tensor(strategies, device=device)}
+            "events": torch.as_tensor(events, device=device), "opponent_actions": torch.as_tensor(opponent_actions, device=device),
+            "opponent_action_valid": torch.as_tensor(opponent_action_valid, device=device), "opponent_ids": torch.as_tensor(opponent_ids, device=device),
+            "strategy_targets": None if np.all(strategies == strategy_ids["unknown"]) else torch.as_tensor(strategies, device=device)}
 
 
 def array_batch(batch: dict[str, np.ndarray], device: str = "cpu") -> dict[str, torch.Tensor]:
@@ -42,6 +45,7 @@ def array_batch(batch: dict[str, np.ndarray], device: str = "cpu") -> dict[str, 
             "next_action_masks": torch.as_tensor(batch["next_action_masks"], device=device, dtype=torch.bool), "actions": torch.as_tensor(batch["actions"], device=device, dtype=torch.long),
             "rewards": torch.as_tensor(batch["rewards"], device=device, dtype=torch.float32), "continues": torch.as_tensor(batch["continues"], device=device, dtype=torch.float32),
             "events": torch.as_tensor(batch["events"], device=device, dtype=torch.float32), "opponent_actions": torch.as_tensor(batch["opponent_actions"], device=device, dtype=torch.long),
+            "opponent_action_valid": torch.as_tensor(batch.get("opponent_action_valid", np.ones_like(batch["opponent_actions"], dtype=np.bool_)), device=device, dtype=torch.bool),
             "opponent_ids": torch.as_tensor(batch["opponent_ids"], device=device, dtype=torch.long), "strategy_targets": None}
 
 

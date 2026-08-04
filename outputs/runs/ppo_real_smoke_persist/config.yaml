@@ -1,0 +1,13 @@
+checkpoint_interval_steps: 8
+checkpoint_path: outputs/checkpoints/ppo_real_smoke.pt
+device: cuda
+env_config: configs/env/sc2.yaml
+evaluation_episodes: 1
+evaluation_interval_steps: 8
+ppo_config: configs/model/ppo.yaml
+record_training_replay: true
+replay_capacity: 32
+rollout_steps: 8
+seed: 7
+training_replay_path: outputs/replays/ppo_real_smoke.npz
+updates: 1

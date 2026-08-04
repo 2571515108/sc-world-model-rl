@@ -44,7 +44,7 @@ class RealSC2MacroEnv(MacroSC2Env):
                  reward: RewardConfig | None = None) -> None:
         if backend is None:
             raise RealSC2UnavailableError(
-                "RealSC2MacroEnv requires a RealSC2Backend from a configured python-sc2/Ares bot runtime; "
+                "RealSC2MacroEnv requires a RealSC2Backend from the configured PySC2 runtime; "
                 "SyntheticMacroEnv remains fully available without SC2."
             )
         if macro_interval_game_loops <= 0 or max_macro_steps <= 0:

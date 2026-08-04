@@ -1,0 +1,20 @@
+dataset_mode: mixed
+synthetic_replay_path: outputs/replays/synthetic_mixed.npz
+real_replay_path: outputs/replays/real_mixed.npz
+synthetic_ratio: 0.3
+
+model_config: configs/model/rssm.yaml
+checkpoint_path: outputs/checkpoints/world_model_mixed_balanced.pt
+
+updates: 1200
+batch_size: 16
+sequence_length: 24
+burn_in_length: 8
+learning_rate: 0.0002
+max_grad_norm: 100.0
+
+seed: 7
+device: cuda
+precision: bf16-mixed
+validation_fraction: 0.05
+validation_interval: 100

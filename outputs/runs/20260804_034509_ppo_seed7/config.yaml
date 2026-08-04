@@ -1,0 +1,13 @@
+checkpoint_interval_steps: 640
+checkpoint_path: outputs/checkpoints/ppo_real.pt
+device: cuda
+env_config: configs/env/sc2.yaml
+evaluation_episodes: 2
+evaluation_interval_steps: 640
+ppo_config: configs/model/ppo.yaml
+record_training_replay: true
+replay_capacity: 8192
+rollout_steps: 128
+seed: 7
+training_replay_path: outputs/replays/ppo_real_online.npz
+updates: 20

@@ -86,9 +86,10 @@ class ReplayBuffer:
         next_masks = np.stack([item.next_action_mask for item in self._items])
         events = np.stack([item.events for item in self._items])
         np.savez_compressed(path, observations=observations, next_observations=next_observations, action_masks=masks, next_action_masks=next_masks,
-                            events=events, actions=np.asarray([item.action for item in self._items], dtype=np.int64),
-                            opponent_actions=np.asarray([item.opponent_action for item in self._items], dtype=np.int64),
-                            rewards=np.asarray([item.reward for item in self._items], dtype=np.float32),
+                             events=events, actions=np.asarray([item.action for item in self._items], dtype=np.int64),
+                             opponent_actions=np.asarray([item.opponent_action for item in self._items], dtype=np.int64),
+                             opponent_action_valid=np.asarray([item.opponent_action_valid for item in self._items], dtype=np.bool_),
+                             rewards=np.asarray([item.reward for item in self._items], dtype=np.float32),
                             terminated=np.asarray([item.terminated for item in self._items], dtype=np.bool_),
                             truncated=np.asarray([item.truncated for item in self._items], dtype=np.bool_))
         metadata = {"format_version": self.FORMAT_VERSION, "capacity": self.capacity,
@@ -113,9 +114,12 @@ class ReplayBuffer:
             payload = {name: arrays[name] for name in names}
             if "next_action_masks" in arrays.files: payload["next_action_masks"] = arrays["next_action_masks"]
             if "opponent_actions" in arrays.files: payload["opponent_actions"] = arrays["opponent_actions"]
+            if "opponent_action_valid" in arrays.files: payload["opponent_action_valid"] = arrays["opponent_action_valid"]
             count = len(payload["actions"])
             next_masks = payload.get("next_action_masks", payload["action_masks"])
             opponent_actions = payload.get("opponent_actions", np.zeros(count, dtype=np.int64))
+            default_valid = np.asarray([value != "real_sc2" for value in metadata.get("environment_types", ["synthetic"] * count)], dtype=np.bool_)
+            opponent_action_valid = payload.get("opponent_action_valid", default_valid)
             buffer = cls(max(int(metadata["capacity"]), count), seed=seed)
             for index in range(count):
                 buffer.append(MacroTransition(
@@ -127,6 +131,7 @@ class ReplayBuffer:
                     map_name=metadata["map_names"][index], game_loop=int(metadata["game_loops"][index]),
                     events=payload["events"][index].copy(), info=metadata["infos"][index], episode_id=int(metadata["episode_ids"][index]),
                     next_action_mask=next_masks[index].copy(), opponent_action=int(opponent_actions[index]),
+                    opponent_action_valid=bool(opponent_action_valid[index]),
                     environment_type=metadata.get("environment_types", ["synthetic"] * count)[index],
                 ))
         return buffer

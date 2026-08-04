@@ -1,0 +1,27 @@
+# Conversion preserves a single Terran player's fog-of-war perspective.
+replays:
+  - data/replays/*.SC2Replay
+output_path: outputs/replays/expert_terran.npz
+capacity: 5000000
+seed: 7
+
+target_race: Terran
+winners_only: true
+min_apm: 150
+player_id: null
+fail_fast: true
+
+# Keep labels aligned with the live macro decision interval.
+step_mul: 32
+minimum_label_confidence: 0.70
+include_no_op_for_behavior_cloning: false
+# Ask the current client to fetch the replay's required data before requiring
+# its exact Base build. Conversion still refuses a missing runnable binary.
+download_missing_version: true
+
+reward:
+  terminal_win: 1.0
+  terminal_loss: -1.0
+  terminal_draw: -0.1
+  successful_scout_scale: 0.0001
+  clip_value: 1.0

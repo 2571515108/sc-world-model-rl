@@ -1,0 +1,14 @@
+# One-update end-to-end verification for the PySC2 online PPO entry point.
+env_config: configs/env/sc2.yaml
+ppo_config: configs/model/ppo.yaml
+seed: 7
+device: cuda
+updates: 1
+rollout_steps: 8
+evaluation_episodes: 1
+evaluation_interval_steps: 8
+checkpoint_interval_steps: 8
+record_training_replay: true
+replay_capacity: 32
+training_replay_path: outputs/replays/ppo_real_smoke.npz
+checkpoint_path: outputs/checkpoints/ppo_real_smoke.pt

@@ -27,7 +27,7 @@ _UNIT_ALIASES = {
     "tank": "SIEGETANK", "medivac": "MEDIVAC", "viking": "VIKINGFIGHTER", "battlecruiser": "BATTLECRUISER",
 }
 _BUILDING_ALIASES = {
-    "command_center": "COMMANDCENTER", "barracks": "BARRACKS", "factory": "FACTORY", "starport": "STARPORT",
+    "command_center": "COMMANDCENTER", "supply_depot": "SUPPLYDEPOT", "barracks": "BARRACKS", "factory": "FACTORY", "starport": "STARPORT",
     "refinery": "REFINERY", "engineering_bay": "ENGINEERINGBAY", "tech_lab": "TECHLAB", "reactor": "REACTOR",
 }
 
@@ -192,4 +192,4 @@ class RealSC2StateAdapter:
         names = Counter(_name(item) for item in structures)
         idle = lambda name: any(_name(item) == name and bool(getattr(item, "is_idle", True)) for item in structures)
         starts = _items(getattr(bot, "enemy_start_locations", None))
-        return {"worker": bool(workers), "command_center": idle("COMMANDCENTER") or idle("ORBITALCOMMAND"), "barracks": idle("BARRACKS"), "factory": idle("FACTORY"), "starport": idle("STARPORT"), "scout": bool(workers or units), "defend_target": bool(units), "natural_target": names.get("COMMANDCENTER", 0) > 1, "enemy_target": bool(starts), "enemy_natural_target": bool(starts), "enemy_main_target": bool(starts)}
+        return {"worker": bool(workers), "command_center": idle("COMMANDCENTER") or idle("ORBITALCOMMAND"), "supply_depot": idle("SUPPLYDEPOT"), "barracks": idle("BARRACKS"), "factory": idle("FACTORY"), "starport": idle("STARPORT"), "engineering_bay": idle("ENGINEERINGBAY"), "scout": bool(units), "defend_target": bool(units), "natural_target": names.get("COMMANDCENTER", 0) > 1, "enemy_target": bool(starts), "enemy_natural_target": bool(starts), "enemy_main_target": bool(starts)}

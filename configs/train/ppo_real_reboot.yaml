@@ -1,0 +1,15 @@
+# Online PPO starts from the fresh rule-trajectory behavior clone, not an old degenerate policy.
+env_config: configs/env/sc2.yaml
+ppo_config: configs/model/ppo.yaml
+resume_checkpoint: outputs/checkpoints/ppo_behavior_bootstrap.pt
+checkpoint_path: outputs/checkpoints/ppo_real_reboot.pt
+seed: 7
+device: cuda
+updates: 60
+rollout_steps: 64
+evaluation_episodes: 3
+evaluation_interval_steps: 960
+checkpoint_interval_steps: 960
+record_training_replay: true
+replay_capacity: 8192
+training_replay_path: outputs/replays/ppo_real_reboot.npz

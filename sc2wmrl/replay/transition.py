@@ -32,6 +32,7 @@ class MacroTransition:
     episode_id: int = 0
     next_action_mask: np.ndarray | None = None
     opponent_action: int = 0
+    opponent_action_valid: bool | None = None
     environment_type: str = "synthetic"
 
     def __post_init__(self) -> None:
@@ -59,3 +60,9 @@ class MacroTransition:
             raise ValueError("opponent action must be a valid macro action")
         if self.environment_type not in {"synthetic", "real_sc2"}:
             raise ValueError("environment type must be synthetic or real_sc2")
+        # A live/replay SC2 viewpoint contains no aligned opponent command.
+        # Synthetic opponents expose their scripted action, so preserve it.
+        if self.opponent_action_valid is None:
+            self.opponent_action_valid = self.environment_type == "synthetic"
+        else:
+            self.opponent_action_valid = bool(self.opponent_action_valid)

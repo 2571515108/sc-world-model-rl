@@ -12,12 +12,12 @@ class RewardConfig:
 
     terminal_win: float = 1.0
     terminal_loss: float = -1.0
-    terminal_draw: float = 0.0
+    terminal_draw: float = -0.1
     army_advantage_scale: float = 0.02
     worker_advantage_scale: float = 0.005
     base_advantage_scale: float = 0.02
     technology_progress_scale: float = 0.01
-    successful_scout_scale: float = 0.01
+    successful_scout_scale: float = 0.0001
     map_control_scale: float = 0.005
     resource_efficiency_scale: float = 0.002
     enemy_damage_scale: float = 0.005

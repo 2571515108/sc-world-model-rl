@@ -61,7 +61,7 @@ class SyntheticMacroEnv(MacroSC2Env):
             "game_time": 0, "minerals": 500.0, "vespene": 0.0, "current_supply": 12,
             "maximum_supply": 15, "worker_count": 12, "base_count": 1, "idle_worker_count": 0,
             "army_value": 0.0, "lost_army_value": 0.0,
-            "buildings": {"command_center": 1, "barracks": 0, "factory": 0, "starport": 0,
+            "buildings": {"command_center": 1, "supply_depot": 0, "barracks": 0, "factory": 0, "starport": 0,
                           "refinery": 0, "engineering_bay": 0, "tech_lab": 0, "reactor": 0},
             "completed_upgrade_flags": [0] * 6, "production_queue_summary": [0] * 5,
             "units": {"marine": 0, "marauder": 0, "reaper": 0, "hellion": 0, "tank": 0,
@@ -136,7 +136,7 @@ class SyntheticMacroEnv(MacroSC2Env):
         if action == MacroAction.TRAIN_WORKERS:
             s["minerals"] -= 50; s["worker_count"] += 1; s["current_supply"] += 1
         elif action == MacroAction.BUILD_SUPPLY:
-            s["minerals"] -= 100; s["maximum_supply"] = min(200, s["maximum_supply"] + 8)
+            s["minerals"] -= 100; b["supply_depot"] += 1; s["maximum_supply"] = min(200, s["maximum_supply"] + 8)
             result["event"] = "supply_built"
         elif action == MacroAction.BUILD_BARRACKS:
             s["minerals"] -= 150; b["barracks"] += 1; result["event"] = "barracks_built"
@@ -155,8 +155,11 @@ class SyntheticMacroEnv(MacroSC2Env):
         elif action == MacroAction.TRAIN_ANTI_AIR:
             s["minerals"] -= 100; s["vespene"] -= 100; s["current_supply"] += 2; u["viking"] += 1; s["army_value"] += 200
         elif action == MacroAction.RESEARCH_UPGRADE:
-            s["minerals"] -= 100; s["vespene"] -= 100
-            index = s["completed_upgrade_flags"].index(0); s["completed_upgrade_flags"][index] = 1; result["event"] = "tech_completed"
+            if b["engineering_bay"] == 0:
+                s["minerals"] -= 150; b["engineering_bay"] += 1; result["event"] = "engineering_bay_built"
+            else:
+                s["minerals"] -= 100; s["vespene"] -= 100
+                index = s["completed_upgrade_flags"].index(0); s["completed_upgrade_flags"][index] = 1; result["event"] = "tech_completed"
         elif action in (MacroAction.SCOUT_ENEMY_MAIN, MacroAction.SCOUT_EXPANSION):
             self._enemy["visible"] = True; self._enemy["last_seen"] = self._state["game_time"]
             result["event"] = "scouted"

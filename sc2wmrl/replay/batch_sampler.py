@@ -22,5 +22,6 @@ class ArrayBatchSampler:
         return {"observations": arrays["observations"][indexes], "next_observations": arrays["next_observations"][indexes],
                 "next_action_masks": self.replay.next_action_masks[indexes], "actions": arrays["actions"][indexes], "rewards": arrays["rewards"][indexes],
                 "continues": (~(arrays["terminated"][indexes] | arrays["truncated"][indexes])).astype(np.float32), "events": arrays["events"][indexes],
-                "opponent_actions": self.replay.opponent_actions[indexes], "opponent_ids": self.replay.opponent_ids[indexes[:, 0]],
+                "opponent_actions": self.replay.opponent_actions[indexes], "opponent_action_valid": self.replay.opponent_action_valid[indexes],
+                "opponent_ids": self.replay.opponent_ids[indexes[:, 0]],
                 "environment_is_real": (self.replay.environment_types[indexes[:, 0]] == "real_sc2").astype(np.float32)}

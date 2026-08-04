@@ -7,10 +7,10 @@ opponent: economy_bot
 reward:
   terminal_win: 1.0
   terminal_loss: -1.0
-  terminal_draw: 0.0
+  terminal_draw: -0.1
   army_advantage_scale: 0.02
   worker_advantage_scale: 0.005
   base_advantage_scale: 0.02
   technology_progress_scale: 0.01
-  successful_scout_scale: 0.01
+  successful_scout_scale: 0.0001
   map_control_scale: 0.005

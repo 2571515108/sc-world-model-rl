@@ -36,6 +36,46 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available(), tor
 
 All training configurations use `device: auto`, which selects CUDA when available and otherwise falls back to CPU. Set `device: cuda` to require GPU execution or `device: cpu` for an explicit CPU run.
 
+## Expert Replay Pretraining
+
+Human replays are used in two deliberately separate stages. The world model
+trains on every visible macro transition, while behavior cloning uses only
+high-confidence human macro labels to initialize the PPO actor. PPO itself
+remains strictly on-policy and fine-tunes only after behavior cloning. Unknown
+opponent commands from an observed replay viewpoint are explicitly excluded
+from the world-model opponent-action loss.
+
+Replay metadata can be inspected without launching SC2. Full conversion needs
+the exact StarCraft II build embedded in the replay; this is a compatibility
+requirement, not a package-version preference.
+
+```powershell
+python -m scripts.inspect_sc2_replay data/replays/example.SC2Replay --race Terran --min-apm 150
+python -m scripts.prepare_sc2_replay_version --replay data/replays/example.SC2Replay --output outputs/replay_version.json
+python -m scripts.convert_sc2_replays --config configs/replays/expert_terran.yaml --replays data/replays/example.SC2Replay --player-id 2 --output outputs/replays/expert_terran.npz
+python -m scripts.validate_expert_replay_dataset --replay outputs/replays/expert_terran.npz
+python -m scripts.train_world_model --config configs/train/world_model_expert.yaml
+python -m scripts.train_behavior_cloning --config configs/train/behavior_cloning_expert.yaml
+python -m scripts.train_ppo --config configs/train/ppo_real_after_expert.yaml
+```
+
+The preparation command sends the protocol's `download_data=true` request to
+the currently installed client and records whether the exact replay executable
+actually appeared. It does not claim success when Blizzard cannot provide a
+retired binary; conversion requires `executable_present_after: true`.
+
+After online PPO collection, merge the new real trajectory data before
+continuing world-model training:
+
+```powershell
+python -m scripts.merge_replays --inputs outputs/replays/expert_terran.npz outputs/replays/ppo_real_after_expert.npz --output outputs/replays/real_expert_plus_online.npz
+python -m scripts.train_world_model --config configs/train/world_model_expert_plus_online.yaml
+```
+
+See [the expert replay guide](docs/EXPERT_REPLAY_PRETRAINING.md) for dataset
+quality gates, compatibility requirements, and the full rationale for keeping
+behavior cloning separate from on-policy PPO.
+
 ## Short End-to-End Workflow
 
 ```powershell
@@ -110,22 +150,25 @@ using GPU utilization alone to infer bottlenecks.
 `SyntheticMacroEnv` is retained for unit tests, pipeline checks, and rapid
 experimentation. Its transitions are simulated and must not be represented as
 real StarCraft II data. `RealSC2MacroEnv` launches a configured local SC2 match
-through `burnysc2`, extracts only BotAI-visible state, and is the path for
-final world-model and real-environment RL data collection.
+through PySC2, extracts only raw units visible to the agent, and is the path
+for final world-model and real-environment RL data collection.
 
 Install the optional dependency and ensure StarCraft II plus the requested map
 are installed locally (do not hard-code either path in this repository):
 
 ```powershell
-python -m pip install "burnysc2>=6.6"
+conda create -n sc2wmrl-pysc2 python=3.10 -y
+conda activate sc2wmrl-pysc2
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
 
-The default `PythonSC2Backend` uses a dedicated game thread and queue bridge so
-the synchronous macro environment does not call `asyncio.run()` inside an
-existing event loop. It launches a builtin opponent from `configs/env/sc2.yaml`.
-For Ares or an existing BotAI runtime, implement the small `RealSC2Backend`
-protocol instead. The state adapter never queries hidden enemy state; enemy
-features use visible units, structures, and local scouting memory only.
+The default `PySC2Backend` owns a synchronous `SC2Env` with raw-unit and
+raw-action interfaces, so it has no BotAI event loop or worker-thread signal
+handler. It launches a builtin opponent from `configs/env/sc2.yaml`. The state
+adapter never queries hidden enemy state; enemy features use visible raw units
+and local scouting memory only. `backend: pysc2` is the only bundled real-SC2
+backend.
 
 ```powershell
 # Optional manual smoke test. This starts a real SC2 process, executes real
@@ -141,6 +184,10 @@ python -m scripts.collect_trajectories --config configs/collect/synthetic.yaml
 # Train only from real transitions, or pretrain using an explicit 80/20 mix.
 python -m scripts.train_world_model --config configs/train/world_model_real.yaml
 python -m scripts.train_world_model --config configs/train/world_model_mixed.yaml
+
+# Train PPO online against the configured real SC2 opponent. This command
+# collects PySC2 rollouts and never creates a SyntheticMacroEnv.
+python -m scripts.train_ppo --config configs/train/ppo_real.yaml
 
 # Hybrid fine-tuning and fixed-opponent real-game evaluation.
 python -m scripts.train_hybrid --config configs/train/hybrid_real.yaml

@@ -1,0 +1,16 @@
+# Continue a saved real-SC2 PPO run without discarding policy or optimizer state.
+env_config: configs/env/sc2.yaml
+ppo_config: configs/model/ppo.yaml
+resume_checkpoint: outputs/checkpoints/ppo_real.pt
+checkpoint_path: outputs/checkpoints/ppo_real_continued.pt
+
+seed: 7
+device: cuda
+updates: 30
+rollout_steps: 96
+evaluation_episodes: 2
+evaluation_interval_steps: 960
+checkpoint_interval_steps: 960
+record_training_replay: true
+replay_capacity: 4096
+training_replay_path: outputs/replays/ppo_real_continued.npz

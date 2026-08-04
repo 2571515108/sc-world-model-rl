@@ -22,6 +22,9 @@ class ArrayReplay:
         self.opponent_ids = np.asarray([zlib.crc32(str(value).encode()) % 128 for value in metadata["opponent_ids"]], dtype=np.int64)
         self.environment_types = np.asarray(metadata.get("environment_types", ["synthetic"] * self.size))
         self.opponent_actions = arrays.get("opponent_actions", np.asarray([int(info.get("opponent_action", 0)) for info in metadata["infos"]], dtype=np.int64))
+        self.opponent_action_valid = arrays.get(
+            "opponent_action_valid", (self.environment_types != "real_sc2").astype(np.bool_)
+        )
         self.next_action_masks = arrays.get("next_action_masks", arrays["action_masks"])
         self._start_cache: dict[tuple[int, bool], np.ndarray] = {}
 

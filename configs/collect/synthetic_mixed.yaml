@@ -1,0 +1,10 @@
+env_config: configs/env/synthetic.yaml
+seed: 7
+device: cuda
+collector:
+  episodes: 200
+  policy: mixed
+  random_probability: 0.25
+  rule_based_probability: 0.75
+  policy_probability: 0.0
+  replay_path: outputs/replays/synthetic_mixed.npz

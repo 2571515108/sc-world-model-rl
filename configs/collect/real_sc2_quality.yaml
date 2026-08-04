@@ -1,0 +1,7 @@
+env_config: configs/env/sc2.yaml
+seed: 7
+device: cuda
+collector:
+  episodes: 60
+  policy: rule_based
+  replay_path: outputs/replays/real_quality.npz

@@ -8,5 +8,15 @@ torch>=2.2; platform_system != "Windows"
 pytest>=8.0
 matplotlib>=3.8
 pandas>=2.1
-tensorboard>=2.16
-# Optional for a real SC2 client/backend. Install with: pip install "burnysc2>=6.6"
+# TensorBoard 2.16 remains compatible with PySC2's protobuf 3.20 requirement.
+tensorboard==2.16.2; python_version < "3.11"
+tensorboard>=2.16; python_version >= "3.11"
+# Optional real-SC2 backend. PySC2 4.0 requires Python 3.8--3.10; install it
+# inside the dedicated Python 3.10 environment with: pip install pysc2==4.0.0
+pysc2==4.0.0; python_version < "3.11"
+# PySC2 4.0 ships protobuf modules generated before protobuf 4.x.  Newer
+# protobuf releases reject those descriptors during import.
+protobuf==3.20.3; python_version < "3.11"
+# Engine-free replay metadata inspection and exact-version replay extraction.
+mpyq>=0.2.5
+s2clientprotocol; python_version < "3.11"

@@ -1,20 +1,30 @@
 environment:
   type: real_sc2
-  map_name: "AcropolisLE"
+  backend: pysc2
+  # PySC2 map registry name; the corresponding file is AcropolisLE.SC2Map.
+  map_name: "Acropolis"
+  # Battle.net places this ladder map directly in SC2PATH/Maps.
+  map_file: "AcropolisLE.SC2Map"
   race: Terran
   opponent:
     type: builtin
     race: Terran
     difficulty: Medium
   macro_interval_game_loops: 32
-  max_macro_steps: 256
+  # Keep an issued macro command reserved for two macro decisions.  This
+  # prevents redundant raw commands while SC2 is applying production/build orders.
+  command_cooldown_game_loops: 64
+  # 768 * 32 / 22.4 is about 18 minutes, allowing decisive real outcomes.
+  max_macro_steps: 768
   realtime: false
-  timeout_seconds: 120
+  # Host-side safety ceiling; this is now enforced by the PySC2 backend.
+  timeout_seconds: 1800
 seed: 7
 map_width: 200.0
 map_height: 200.0
 reward:
   terminal_win: 1.0
   terminal_loss: -1.0
-  terminal_draw: 0.0
+  terminal_draw: -0.1
+  successful_scout_scale: 0.0001
   clip_value: 1.0
