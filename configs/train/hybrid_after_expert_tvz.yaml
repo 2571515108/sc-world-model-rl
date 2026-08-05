@@ -1,0 +1,16 @@
+# Real-only TVZ hybrid policy fine-tuning using the updated world model.
+real_env_config: configs/env/sc2_tvz.yaml
+replay_path: outputs/replays/real_expert_tvz_plus_online.npz
+world_model_checkpoint: outputs/checkpoints/world_model_expert_plus_online_tvz.pt
+policy_checkpoint: outputs/checkpoints/ppo_real_after_expert_tvz.pt
+checkpoint_path: outputs/checkpoints/hybrid_after_expert_tvz.pt
+rollout_steps: 96
+updates: 80
+imagination_weight_max: 0.20
+imagination_warmup_updates: 15
+imagined_batch_size: 8
+imagined_sequence_length: 16
+imagination_horizon: 10
+uncertainty_threshold: 0.75
+seed: 7
+device: cuda

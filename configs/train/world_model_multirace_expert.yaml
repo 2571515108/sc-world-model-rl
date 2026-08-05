@@ -1,0 +1,22 @@
+# Train shared P/T/Z world dynamics from local replay viewpoints only.
+dataset_mode: real_only
+replay_path: outputs/replays/expert_multirace.npz
+use_array_replay: true
+validate_replay_on_index_build: true
+race_balanced_sampling: true
+race_sampling:
+  Terran: 0.34
+  Protoss: 0.33
+  Zerg: 0.33
+model_config: configs/model/rssm_multirace.yaml
+checkpoint_path: outputs/checkpoints/world_model_multirace_expert.pt
+updates: 4000
+batch_size: 24
+sequence_length: 24
+burn_in_length: 8
+learning_rate: 0.0002
+max_grad_norm: 100.0
+validation_fraction: 0.0
+seed: 7
+device: cuda
+precision: bf16-mixed

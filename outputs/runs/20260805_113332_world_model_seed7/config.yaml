@@ -1,0 +1,21 @@
+batch_size: 24
+burn_in_length: 8
+checkpoint_path: outputs/checkpoints/world_model_multirace_expert.pt
+dataset_mode: real_only
+device: cuda
+learning_rate: 0.0002
+max_grad_norm: 100.0
+model_config: configs/model/rssm_multirace.yaml
+precision: bf16-mixed
+race_balanced_sampling: true
+race_sampling:
+  Protoss: 0.33
+  Terran: 0.34
+  Zerg: 0.33
+replay_path: outputs/replays/expert_multirace.npz
+seed: 7
+sequence_length: 24
+updates: 4000
+use_array_replay: true
+validate_replay_on_index_build: true
+validation_fraction: 0.0

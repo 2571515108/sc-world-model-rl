@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sc2wmrl.replays.extractor import _require_sc2
+from sc2wmrl.replays.extractor import _require_sc2, configure_sc2_path
 from sc2wmrl.replays.metadata import inspect_replay_metadata
 from sc2wmrl.replays.versioning import prepare_replay_version
 
@@ -16,9 +16,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--replay", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--sc2-path", default="D:/Program Files (x86)/StarCraft II")
     args = parser.parse_args()
     replay = Path(args.replay).expanduser().resolve()
     metadata = inspect_replay_metadata(replay)
+    configure_sc2_path(args.sc2_path)
     run_configs, _, sc_pb = _require_sc2()
     report = prepare_replay_version(replay, metadata, run_configs=run_configs, sc_pb=sc_pb)
     output = Path(args.output)

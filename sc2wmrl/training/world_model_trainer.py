@@ -27,6 +27,10 @@ def sequence_batch(sequences: list[list[object]], device: str = "cpu") -> dict[s
     events = np.stack([[item.events for item in sequence] for sequence in sequences])
     opponent_actions = np.asarray([[int(item.opponent_action) for item in sequence] for sequence in sequences], dtype=np.int64)
     opponent_action_valid = np.asarray([[bool(item.opponent_action_valid) for item in sequence] for sequence in sequences], dtype=np.bool_)
+    player_races = np.asarray([int(sequence[0].info.get("player_race_id", 0)) for sequence in sequences], dtype=np.int64)
+    opponent_races = np.asarray([int(sequence[0].info.get("opponent_race_id", 0)) for sequence in sequences], dtype=np.int64)
+    feature_masks = np.stack([[np.asarray(item.info.get("feature_valid_mask", np.ones_like(item.observation, dtype=np.bool_)), dtype=np.bool_) for item in sequence] for sequence in sequences])
+    next_feature_masks = np.stack([[np.asarray(item.info.get("next_feature_valid_mask", np.ones_like(item.observation, dtype=np.bool_)), dtype=np.bool_) for item in sequence] for sequence in sequences])
     strategy_ids = {"rush": 0, "economy": 1, "defensive": 2, "ground_tech": 3, "air_tech": 4, "unknown": 5}
     strategies = np.asarray([strategy_ids.get(str(sequence[0].info.get("enemy_strategy", "unknown")).removesuffix("_bot"), 5) for sequence in sequences], dtype=np.int64)
     opponent_ids = np.asarray([zlib.crc32(sequence[0].opponent_id.encode()) % 128 for sequence in sequences], dtype=np.int64)
@@ -34,7 +38,9 @@ def sequence_batch(sequences: list[list[object]], device: str = "cpu") -> dict[s
             "rewards": torch.as_tensor(rewards, device=device), "continues": torch.as_tensor(continues, device=device),
             "events": torch.as_tensor(events, device=device), "opponent_actions": torch.as_tensor(opponent_actions, device=device),
             "opponent_action_valid": torch.as_tensor(opponent_action_valid, device=device), "opponent_ids": torch.as_tensor(opponent_ids, device=device),
-            "strategy_targets": None if np.all(strategies == strategy_ids["unknown"]) else torch.as_tensor(strategies, device=device)}
+            "strategy_targets": None if np.all(strategies == strategy_ids["unknown"]) else torch.as_tensor(strategies, device=device),
+            "player_races": torch.as_tensor(player_races, device=device), "opponent_races": torch.as_tensor(opponent_races, device=device),
+            "feature_valid_masks": torch.as_tensor(feature_masks, device=device), "next_feature_valid_masks": torch.as_tensor(next_feature_masks, device=device)}
 
 
 def array_batch(batch: dict[str, np.ndarray], device: str = "cpu") -> dict[str, torch.Tensor]:
@@ -46,7 +52,14 @@ def array_batch(batch: dict[str, np.ndarray], device: str = "cpu") -> dict[str, 
             "rewards": torch.as_tensor(batch["rewards"], device=device, dtype=torch.float32), "continues": torch.as_tensor(batch["continues"], device=device, dtype=torch.float32),
             "events": torch.as_tensor(batch["events"], device=device, dtype=torch.float32), "opponent_actions": torch.as_tensor(batch["opponent_actions"], device=device, dtype=torch.long),
             "opponent_action_valid": torch.as_tensor(batch.get("opponent_action_valid", np.ones_like(batch["opponent_actions"], dtype=np.bool_)), device=device, dtype=torch.bool),
-            "opponent_ids": torch.as_tensor(batch["opponent_ids"], device=device, dtype=torch.long), "strategy_targets": None}
+            "opponent_ids": torch.as_tensor(batch["opponent_ids"], device=device, dtype=torch.long), "strategy_targets": None,
+            "player_races": torch.as_tensor(batch.get("player_races", np.zeros(len(batch["observations"]), dtype=np.int64)), device=device, dtype=torch.long),
+            "opponent_races": torch.as_tensor(batch.get("opponent_races", np.zeros(len(batch["observations"]), dtype=np.int64)), device=device, dtype=torch.long),
+            "feature_valid_masks": torch.as_tensor(batch.get("feature_valid_masks", np.ones_like(batch["observations"], dtype=np.bool_)), device=device, dtype=torch.bool),
+            "next_feature_valid_masks": torch.as_tensor(batch.get("next_feature_valid_masks", np.ones_like(batch["next_observations"], dtype=np.bool_)), device=device, dtype=torch.bool),
+            "next_action_mask_valid": torch.as_tensor(batch.get("next_action_mask_valid", np.ones_like(batch["actions"], dtype=np.bool_)), device=device, dtype=torch.bool),
+            "universal_intents": torch.as_tensor(batch.get("universal_intents", np.zeros_like(batch["actions"])), device=device, dtype=torch.long),
+            "universal_intent_valid": torch.as_tensor(batch.get("universal_intent_valid", np.zeros_like(batch["actions"], dtype=np.bool_)), device=device, dtype=torch.bool)}
 
 
 class WorldModelTrainer:
@@ -104,13 +117,13 @@ class WorldModelTrainer:
     def open_loop_evaluate(self, sequences: list[list[object]]) -> dict[str, float]:
         """Measure posterior reconstruction and prior multi-step observation drift."""
         batch = sequence_batch(sequences, self.device); self.model.eval()
-        priors, posts, context, _ = self.model.observe(batch["observations"], batch["actions"], batch["opponent_ids"], next_observations=batch["next_observations"], sample=False)
+        priors, posts, context, _ = self.model.observe(batch["observations"], batch["actions"], batch["opponent_ids"], batch.get("player_races"), batch.get("opponent_races"), next_observations=batch["next_observations"], sample=False)
         posterior_features = torch.stack([self.model.rssm.feature(state) for state in posts], 1)
-        reconstruction_mse = torch.mean((self.model.observation_head(posterior_features) - batch["next_observations"]) ** 2).item()
-        state = self.model.rssm.initial_posterior(self.model.observation_encoder(batch["observations"][:, 0]), sample=False); predictions = []
+        reconstruction_mse = torch.mean((self.model._decode_observations(posterior_features, batch.get("player_races"), batch.get("opponent_races")) - batch["next_observations"]) ** 2).item()
+        state = self.model.rssm.initial_posterior(self.model._encode_observations(batch["observations"][:, 0], batch.get("player_races"), batch.get("opponent_races")), sample=False); predictions = []
         for time in range(batch["observations"].shape[1]):
             state = self.model.rssm.prior(state, batch["actions"][:, time], context, sample=False)
-            predictions.append(self.model.observation_head(self.model.rssm.feature(state)))
+            predictions.append(self.model._decode_observations(self.model.rssm.feature(state), batch.get("player_races"), batch.get("opponent_races")))
         open_loop = torch.stack(predictions, 1)
         horizon_errors = ((open_loop - batch["next_observations"]) ** 2).mean(dim=(0, 2))
         return {"reconstruction_mse": float(reconstruction_mse), **{f"open_loop_mse_h{index + 1}": float(error) for index, error in enumerate(horizon_errors)}}
@@ -132,5 +145,18 @@ class WorldModelTrainer:
         resolved_device = resolve_device(device); payload = torch.load(Path(path), map_location=resolved_device, weights_only=False)
         if payload.get("format_version") != 2: raise ValueError("world-model checkpoint format 1 is not transition-aligned; retrain with format 2")
         trainer = cls(WorldModel(WorldModelConfig(**payload["config"])), device=str(resolved_device), precision=str(payload.get("precision", "fp32")))
-        trainer.model.load_state_dict(payload["model"]); trainer.optimizer.load_state_dict(payload["optimizer"])
+        incompatible = trainer.model.load_state_dict(payload["model"], strict=False)
+        unexpected = set(incompatible.unexpected_keys)
+        missing = set(incompatible.missing_keys)
+        allowed_missing = {name for name in missing if name.startswith(("race_embedding.", "race_adapter.", "race_observation_bias.", "universal_intent_head."))}
+        if unexpected or missing != allowed_missing:
+            raise ValueError(f"checkpoint is incompatible with the current world model: missing={sorted(missing)}, unexpected={sorted(unexpected)}")
+        # Older v2 checkpoints predate the race adapter and intent head. Their
+        # optimizer state has fewer parameter slots, so retaining the weights
+        # is safe but restoring that stale optimizer state is not.
+        try:
+            trainer.optimizer.load_state_dict(payload["optimizer"])
+        except ValueError:
+            if not allowed_missing:
+                raise
         return trainer

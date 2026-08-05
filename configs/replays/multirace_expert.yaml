@@ -1,0 +1,17 @@
+# Every replay produces one fog-of-war episode for each P/T/Z participant.
+replays:
+  - data/replays/*.SC2Replay
+output_path: outputs/replays/expert_multirace.npz
+sc2_path: "D:/Program Files (x86)/StarCraft II"
+races: [Terran, Protoss, Zerg]
+min_apm: 0
+fail_fast: false
+step_mul: 32
+minimum_label_confidence: 0.70
+download_missing_version: true
+map_file: null
+
+reward:
+  terminal_win: 1.0
+  terminal_loss: -1.0
+  terminal_draw: -0.1

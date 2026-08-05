@@ -64,6 +64,11 @@ the currently installed client and records whether the exact replay executable
 actually appeared. It does not claim success when Blizzard cannot provide a
 retired binary; conversion requires `executable_present_after: true`.
 
+If SC2 reports a missing `.s2ma` map archive, obtain the exact `.SC2Map` for
+the replay's map and set `map_file` in `configs/replays/expert_terran.yaml`.
+The converter then sends that archive as `RequestStartReplay.map_data`, without
+depending on the local Battle.net cache.
+
 After online PPO collection, merge the new real trajectory data before
 continuing world-model training:
 
@@ -75,6 +80,45 @@ python -m scripts.train_world_model --config configs/train/world_model_expert_pl
 See [the expert replay guide](docs/EXPERT_REPLAY_PRETRAINING.md) for dataset
 quality gates, compatibility requirements, and the full rationale for keeping
 behavior cloning separate from on-policy PPO.
+
+The supplied expert match is Terran versus Zerg. Use the TVZ-specific training
+and evaluation configurations (`*_tvz.yaml`) after conversion so the online
+opponent, checkpoints, and real replay paths remain matchup-consistent.
+
+## Multi-Race Expert Replay Pretraining
+
+`configs/replays/multirace_expert.yaml` converts every Terran, Protoss, and
+Zerg participant in each replay as a separate fog-of-war episode. The model
+never receives both players' observations as one policy input. A paired-view
+index is retained only for future opponent-belief supervision.
+
+The multi-race dataset has a separate, 112-dimensional semantic feature schema.
+It contains player/opponent race conditioning, cross-race unit categories,
+feature-validity masks, universal intents, race-conditioned actions, source
+replay IDs, map IDs, player IDs, game loops, and paired-view indices in the
+NPZ itself. It is intentionally not compatible with legacy 106-dimensional
+Terran PPO checkpoints.
+
+```powershell
+# The supplied multi-race files currently require Base97425. Run this once;
+# check for executable_present_after: true before conversion.
+python -m scripts.prepare_sc2_replay_version --replay data/replays/014a5f3dc8482a679269e332954fe047.SC2Replay --output outputs/replay_version_97425.json
+
+# Convert both local viewpoints from every P/T/Z replay, then validate.
+python -m scripts.convert_sc2_replays_multirace --config configs/replays/multirace_expert.yaml
+python -m scripts.validate_multirace_replay_dataset --dataset outputs/replays/expert_multirace.npz
+
+# Shared RSSM training is balanced by player race. Only Terran labels train
+# this repository's existing Terran PPO actor; Protoss/Zerg labels stay in the
+# shared world-model and universal-intent objectives.
+python -m scripts.train_world_model --config configs/train/world_model_multirace_expert.yaml
+python -m scripts.pretrain_ppo_multirace_terran --config configs/train/behavior_cloning_multirace_terran.yaml
+```
+
+If a replay's exact binary or map archive is absent, do not substitute a nearby
+SC2 version. Let the preparation command request the archived data, then set
+`map_file` in `configs/replays/multirace_expert.yaml` when an exact `.SC2Map`
+archive must be supplied.
 
 ## Short End-to-End Workflow
 

@@ -1,0 +1,24 @@
+environment:
+  type: real_sc2
+  backend: pysc2
+  map_name: "Acropolis"
+  map_file: "AcropolisLE.SC2Map"
+  race: Terran
+  opponent:
+    type: builtin
+    race: Zerg
+    difficulty: Medium
+  macro_interval_game_loops: 32
+  command_cooldown_game_loops: 64
+  max_macro_steps: 768
+  realtime: false
+  timeout_seconds: 1800
+seed: 7
+map_width: 200.0
+map_height: 200.0
+reward:
+  terminal_win: 1.0
+  terminal_loss: -1.0
+  terminal_draw: -0.1
+  successful_scout_scale: 0.0001
+  clip_value: 1.0

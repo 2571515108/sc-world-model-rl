@@ -18,6 +18,7 @@ def _raw_unit_dict(unit: Any) -> dict[str, Any]:
         # same canonical value for the shared state adapter.
         "build_progress": float(unit.build_progress) * 100.0,
         "order_length": len(unit.orders), "add_on_tag": int(unit.add_on_tag),
+        "orders": [int(order.ability_id) for order in unit.orders],
     }
 
 
@@ -33,6 +34,7 @@ def controller_observation_dict(response: Any) -> dict[str, Any]:
             common.warp_gate_count, common.larva_count,
         ], dtype=np.float32),
         "game_loop": np.asarray([observation.game_loop], dtype=np.int64),
+        "upgrades": np.asarray(list(observation.raw_data.player.upgrade_ids), dtype=np.int32),
     }
 
 

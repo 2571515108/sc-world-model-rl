@@ -12,7 +12,7 @@ from sc2wmrl.models.world_model import WorldModel, WorldModelConfig
 from sc2wmrl.replay.replay_buffer import ReplayBuffer
 from sc2wmrl.replay.sequence_sampler import MixedSequenceSampler, SequenceSampler, split_replay_by_episode
 from sc2wmrl.replay.array_replay import ArrayReplay
-from sc2wmrl.replay.batch_sampler import ArrayBatchSampler
+from sc2wmrl.replay.batch_sampler import ArrayBatchSampler, RaceBalancedArrayBatchSampler
 from sc2wmrl.training.world_model_trainer import WorldModelTrainer
 from sc2wmrl.utils.config import load_yaml
 from sc2wmrl.utils.seed import set_global_seed
@@ -40,7 +40,9 @@ def main() -> None:
     else:
         if use_array_replay:
             offline = ArrayReplay.load(config["replay_path"]); replay = None
-            array_sampler = ArrayBatchSampler(offline, seed=seed, validate_replay_on_index_build=bool(config.get("validate_replay_on_index_build", True)))
+            sampler_type = RaceBalancedArrayBatchSampler if bool(config.get("race_balanced_sampling", False)) else ArrayBatchSampler
+            sampler_kwargs = {"race_sampling": dict(config.get("race_sampling", {}))} if sampler_type is RaceBalancedArrayBatchSampler else {}
+            array_sampler = sampler_type(offline, seed=seed, validate_replay_on_index_build=bool(config.get("validate_replay_on_index_build", True)), **sampler_kwargs)
             expected = "real_sc2" if mode == "real_only" else "synthetic"
             if not np.all(offline.environment_types == expected): raise ValueError(f"{mode} configuration received non-{expected} transitions")
         else: replay = ReplayBuffer.load(config["replay_path"], seed=seed)

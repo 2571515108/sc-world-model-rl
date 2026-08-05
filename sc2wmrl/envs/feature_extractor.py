@@ -14,6 +14,7 @@ REGIONS = (
     "left_route", "right_route", "expansion_regions",
 )
 UNIT_TYPES = ("marine", "marauder", "reaper", "hellion", "tank", "medivac", "viking", "battlecruiser")
+_RAW_UNIT_IDS = {"marine": 48, "marauder": 51, "reaper": 49, "hellion": 53, "tank": 33, "medivac": 54, "viking": 35, "battlecruiser": 57}
 BUILDINGS = ("command_center", "barracks", "factory", "starport", "refinery", "engineering_bay", "tech_lab", "reactor")
 STRATEGIES = ("rush", "economy", "defensive", "ground_tech", "air_tech", "unknown")
 
@@ -101,7 +102,10 @@ class FeatureExtractor:
                    self._ratio(state.get("army_center_y", 0), self.map_height), self._ratio(state.get("number_of_army_groups", 0), 10)]
         enemy = state.get("enemy", {})
         observed = enemy.get("observed_unit_counts", {})
-        values += [self._ratio(observed.get(name, 0), 200) for name in UNIT_TYPES]
+        # Replay-controller observations expose SC2's stable numerical unit
+        # IDs, whereas older live states used human-readable keys.  Accept
+        # both forms so a visible Marine never becomes an all-zero feature.
+        values += [self._ratio(observed.get(name, observed.get(str(_RAW_UNIT_IDS[name]), 0)), 200) for name in UNIT_TYPES]
         enemy_buildings = enemy.get("observed_buildings", {})
         values += [self._ratio(enemy_buildings.get(name, 0), 20) for name in ("base", "production", "ground_tech", "air_tech")]
         position = enemy.get("last_seen_army_position")

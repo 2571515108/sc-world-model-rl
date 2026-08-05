@@ -82,6 +82,8 @@ class PySC2StateAdapter:
         self._enemy_counts: Counter[int] = Counter()
         self._enemy_position: tuple[float, float] | None = None
         self._last_seen_loop: int | None = None
+        self._previous_own_values: Counter[int] = Counter()
+        self._lost_army_value = 0.0
 
     def extract(self, observation: dict[str, Any], pending_actions: dict[str, bool]) -> dict[str, Any]:
         """Build state only from the agent's raw observation and local memory."""
@@ -103,6 +105,11 @@ class PySC2StateAdapter:
         army = [unit for unit in own if int(_field(unit, "unit_type")) in _ARMY_IDS]
         game_loop = self._game_loop(observation)
         army_value = sum(_UNIT_VALUES.get(int(_field(unit, "unit_type")), 50.0) for unit in army)
+        army_counts = Counter(int(_field(unit, "unit_type")) for unit in army)
+        for unit_type, previous_count in self._previous_own_values.items():
+            removed = max(0, previous_count - army_counts.get(unit_type, 0))
+            self._lost_army_value += removed * _UNIT_VALUES.get(unit_type, 50.0)
+        self._previous_own_values = army_counts
         enemy_value = sum(_UNIT_VALUES.get(unit_type, 50.0) * count for unit_type, count in self._enemy_counts.items())
         own_center = self._center(army)
         return {
@@ -110,22 +117,22 @@ class PySC2StateAdapter:
             "current_supply": supply_used, "maximum_supply": supply_cap,
             "worker_count": len(workers), "base_count": self._count(counts, "COMMANDCENTER", "ORBITALCOMMAND", "PLANETARYFORTRESS"),
             "idle_worker_count": sum(int(_field(unit, "order_length")) == 0 for unit in workers),
-            "army_value": army_value, "lost_army_value": 0.0,
+            "army_value": army_value, "lost_army_value": self._lost_army_value,
             "buildings": {"command_center": self._count(counts, "COMMANDCENTER", "ORBITALCOMMAND", "PLANETARYFORTRESS"),
                           "supply_depot": self._count(counts, "SUPPLYDEPOT"),
                           "barracks": self._count(counts, "BARRACKS"), "factory": self._count(counts, "FACTORY"),
                           "starport": self._count(counts, "STARPORT"), "refinery": self._count(counts, "REFINERY"),
-                          "engineering_bay": self._count(counts, "ENGINEERINGBAY"), "tech_lab": 0, "reactor": 0},
-            "completed_upgrade_flags": [0] * 6,
-            "production_queue_summary": [self._count(counts, name) for name in ("BARRACKS", "FACTORY", "STARPORT", "REFINERY", "COMMANDCENTER")],
+                          "engineering_bay": self._count(counts, "ENGINEERINGBAY"), "tech_lab": counts[5], "reactor": counts[6]},
+            "completed_upgrade_flags": [int(value) for value in np.asarray(observation.get("upgrades", []), dtype=np.int32)[:6]],
+            "production_queue_summary": [sum(int(_field(unit, "order_length")) for unit in own if int(_field(unit, "unit_type")) == _UNIT_IDS[name]) for name in ("BARRACKS", "FACTORY", "STARPORT", "REFINERY", "COMMANDCENTER")],
             "units": {"marine": counts[_UNIT_IDS["MARINE"]], "marauder": counts[_UNIT_IDS["MARAUDER"]], "reaper": counts[_UNIT_IDS["REAPER"]],
                       "hellion": counts[_UNIT_IDS["HELLION"]], "tank": counts[_UNIT_IDS["SIEGETANK"]], "medivac": counts[_UNIT_IDS["MEDIVAC"]],
                       "viking": counts[_UNIT_IDS["VIKINGFIGHTER"]], "battlecruiser": counts[_UNIT_IDS["BATTLECRUISER"]]},
             "average_army_health": self._average_health(army), "army_center_x": own_center[0], "army_center_y": own_center[1],
             "number_of_army_groups": int(bool(army)), "enemy_army_value_estimate": enemy_value,
-            "enemy": {"observed_unit_counts": {str(unit_type): count for unit_type, count in self._enemy_counts.items()}, "observed_buildings": {},
+            "enemy": {"observed_unit_counts": {str(unit_type): count for unit_type, count in self._enemy_counts.items()}, "observed_buildings": {"base": sum(count for unit_type, count in self._enemy_counts.items() if unit_type in {18, 59, 86, 100, 101, 130, 132}), "production": sum(count for unit_type, count in self._enemy_counts.items() if unit_type in {21, 27, 28, 62, 67, 71, 89, 91, 92}), "ground_tech": 0, "air_tech": 0},
                       "last_seen_army_position": self._enemy_position, "time_since_last_scout": 3600.0 if self._last_seen_loop is None else max(0.0, (game_loop - self._last_seen_loop) / 22.4),
-                      "estimated_army_value": enemy_value, "estimated_worker_count": 0.0, "strategy_probabilities": {"unknown": 1.0}},
+                      "estimated_army_value": enemy_value, "estimated_worker_count": float(sum(count for unit_type, count in self._enemy_counts.items() if unit_type in {45, 84, 104})), "strategy_probabilities": {"unknown": 1.0}},
             "map_control": {}, "pending_actions": dict(pending_actions),
             # Gathering workers remain valid construction candidates; raw SC2
             # commands replace their harvest order when they start building.

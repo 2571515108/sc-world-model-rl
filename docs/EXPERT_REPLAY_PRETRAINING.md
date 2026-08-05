@@ -47,6 +47,12 @@ table by launching a fully specified header-derived version. The command
 reports the exact result; it does not assume that a retired executable remains
 available to download.
 
+If replay startup reports a missing `.s2ma` archive, the map cache is missing.
+Obtain the exact `.SC2Map` archive for the replay map, place it under the SC2
+`Maps/` directory (or use an absolute path), and set `map_file` in
+`configs/replays/expert_terran.yaml`. The converter supplies it directly in
+`RequestStartReplay.map_data` and does not need a Battle.net cache entry.
+
 ```powershell
 python -m scripts.inspect_sc2_replay data/replays/example.SC2Replay --race Terran --min-apm 150
 python -m scripts.prepare_sc2_replay_version --replay data/replays/example.SC2Replay --output outputs/replay_version.json

@@ -1,0 +1,17 @@
+# Visible Terran-versus-Zerg expert transitions train world dynamics.
+dataset_mode: real_only
+replay_path: outputs/replays/expert_terran.npz
+use_array_replay: true
+validate_replay_on_index_build: true
+model_config: configs/model/rssm.yaml
+checkpoint_path: outputs/checkpoints/world_model_expert_tvz.pt
+updates: 2000
+batch_size: 32
+sequence_length: 32
+burn_in_length: 8
+learning_rate: 0.0002
+max_grad_norm: 100.0
+validation_fraction: 0.0
+seed: 7
+device: cuda
+precision: bf16-mixed

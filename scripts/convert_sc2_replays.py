@@ -51,6 +51,8 @@ def main() -> None:
         step_mul=int(config.get("step_mul", 32)), minimum_label_confidence=float(config.get("minimum_label_confidence", 0.70)),
         include_no_op_for_behavior_cloning=bool(config.get("include_no_op_for_behavior_cloning", False)),
         download_missing_version=bool(config.get("download_missing_version", True)),
+        map_file=None if config.get("map_file") is None else str(config["map_file"]),
+        sc2_path=None if config.get("sc2_path") is None else str(config["sc2_path"]),
         reward=RewardConfig(**dict(config.get("reward", {}))),
     )
     output = Path(args.output or config["output_path"])

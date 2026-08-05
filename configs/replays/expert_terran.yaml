@@ -4,6 +4,8 @@ replays:
 output_path: outputs/replays/expert_terran.npz
 capacity: 5000000
 seed: 7
+# Explicitly pin PySC2 to the local Windows client used for replay playback.
+sc2_path: "D:/Program Files (x86)/StarCraft II"
 
 target_race: Terran
 winners_only: true
@@ -18,6 +20,9 @@ include_no_op_for_behavior_cloning: false
 # Ask the current client to fetch the replay's required data before requiring
 # its exact Base build. Conversion still refuses a missing runnable binary.
 download_missing_version: true
+# Optional exact ladder-map archive. Use this when the replay's Battle.net map
+# cache is unavailable, for example: "Maps/At Eternity's Edge LE.SC2Map".
+map_file: null
 
 reward:
   terminal_win: 1.0

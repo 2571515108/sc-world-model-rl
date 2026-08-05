@@ -1,0 +1,16 @@
+# Actor-only initialization from converted Terran-versus-Zerg expert labels.
+replay_path: outputs/replays/expert_terran.npz
+ppo_config: configs/model/ppo.yaml
+checkpoint_path: outputs/checkpoints/ppo_expert_bc_tvz.pt
+resume_checkpoint: null
+seed: 7
+device: cuda
+learning_rate: 0.0003
+batch_size: 256
+epochs: 40
+validation_fraction: 0.1
+minimum_confidence: 0.70
+include_no_op: false
+class_balance_power: 0.5
+entropy_coefficient: 0.001
+max_grad_norm: 1.0

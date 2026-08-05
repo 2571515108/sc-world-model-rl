@@ -1,0 +1,5 @@
+env_config: configs/env/sc2_tvz.yaml
+checkpoint_path: outputs/checkpoints/ppo_real_after_expert_tvz.pt
+episodes: 20
+seed: 101
+device: cuda

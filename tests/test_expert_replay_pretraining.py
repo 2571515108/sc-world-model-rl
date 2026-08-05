@@ -17,7 +17,7 @@ from sc2wmrl.replay.replay_buffer import ReplayBuffer
 from sc2wmrl.replay.transition import MacroTransition
 from sc2wmrl.replays.macro_labeler import AbilityNameResolver, ReplayMacroLabeler
 from sc2wmrl.replays.metadata import inspect_replay_metadata, select_expert_players
-from sc2wmrl.replays.extractor import _align_next_action_masks
+from sc2wmrl.replays.extractor import _align_next_action_masks, _map_data
 from sc2wmrl.replays.metadata import ReplayMetadata
 from sc2wmrl.replays.versioning import exact_replay_version, prepare_replay_version, replay_executable_path
 from sc2wmrl.training.behavior_cloning_trainer import (
@@ -127,3 +127,9 @@ def test_prepare_replay_version_sends_download_data_request(tmp_path: Path) -> N
                                     sc_pb=types.SimpleNamespace(RequestReplayInfo=lambda **kwargs: types.SimpleNamespace(**kwargs)))
     assert report.download_requested and not report.executable_present_after and report.replay_info_error is None
     assert sent[0].download_data is True and sent[0].replay_data == b"replay"
+
+
+def test_explicit_map_data_does_not_use_battle_net_cache(tmp_path: Path) -> None:
+    maps = tmp_path / "Maps"; maps.mkdir()
+    archive = maps / "At Eternity's Edge LE.SC2Map"; archive.write_bytes(b"map")
+    assert _map_data(types.SimpleNamespace(data_dir=str(tmp_path)), archive.name) == b"map"

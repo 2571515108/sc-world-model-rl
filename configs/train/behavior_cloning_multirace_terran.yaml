@@ -1,0 +1,15 @@
+# Only Terran, high-confidence labels update this project’s Terran PPO actor.
+replay_path: outputs/replays/expert_multirace.npz
+ppo_config: configs/model/ppo.yaml
+checkpoint_path: outputs/checkpoints/ppo_expert_multirace_terran.pt
+seed: 7
+device: cuda
+learning_rate: 0.0003
+batch_size: 256
+epochs: 40
+validation_fraction: 0.1
+minimum_confidence: 0.70
+include_no_op: false
+class_balance_power: 0.5
+entropy_coefficient: 0.001
+max_grad_norm: 1.0

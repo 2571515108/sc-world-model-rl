@@ -1,0 +1,15 @@
+# Shared dynamics with a lightweight race-conditioned adapter and intent head.
+deterministic_dim: 160
+stochastic_dim: 48
+action_embedding_dim: 32
+opponent_embedding_dim: 32
+hidden_dim: 192
+ensemble_size: 5
+event_dim: 7
+opponent_count: 128
+kl_free_nats: 1.0
+kl_balance: 0.8
+action_mask_coefficient: 0.0
+universal_intent_count: 14
+universal_intent_coefficient: 0.25
+race_embedding_dim: 8

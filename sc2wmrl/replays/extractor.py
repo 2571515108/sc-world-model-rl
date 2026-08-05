@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import asdict, dataclass, field
+import os
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,8 @@ class ReplayExtractionConfig:
     minimum_label_confidence: float = 0.70
     include_no_op_for_behavior_cloning: bool = False
     download_missing_version: bool = True
+    map_file: str | None = None
+    sc2_path: str | None = None
     map_width_fallback: float = 200.0
     map_height_fallback: float = 200.0
     reward: RewardConfig = field(default_factory=lambda: RewardConfig(successful_scout_scale=0.0001, terminal_draw=-0.1))
@@ -78,6 +81,16 @@ def _require_sc2() -> tuple[Any, Any, Any]:
     return run_configs, replay_lib, sc_pb
 
 
+def configure_sc2_path(sc2_path: str | None) -> None:
+    """Pin PySC2 to an explicit SC2 root before creating a run configuration."""
+    if sc2_path is None:
+        return
+    root = Path(sc2_path).expanduser().resolve()
+    if not root.is_dir() or not (root / "Versions").is_dir():
+        raise FileNotFoundError(f"SC2 root must contain a Versions directory: {root}")
+    os.environ["SC2PATH"] = str(root)
+
+
 def _map_size(game_info: Any, config: ReplayExtractionConfig) -> tuple[float, float]:
     size = getattr(getattr(game_info, "start_raw", None), "map_size", None)
     return (float(getattr(size, "x", 0.0) or config.map_width_fallback),
@@ -112,16 +125,22 @@ def _player_names(replay_info: Any, player_id: int) -> tuple[str, str]:
     return expert, opponent
 
 
-def _start_replay(controller: Any, run_config: Any, replay_data: bytes, replay_info: Any, request: Any) -> None:
-    """Start a replay with its local map data when the install provides it."""
-    local_map = getattr(replay_info, "local_map_path", "")
-    if local_map:
-        try:
-            request.map_data = run_config.map_data(local_map)
-        except (FileNotFoundError, OSError, ValueError):
-            # Ladder maps are commonly known to the game client without a local
-            # map payload. The controller supplies a precise error if not.
-            pass
+def _map_data(run_config: Any, map_file: str | None) -> bytes | None:
+    """Load an explicit local map archive without relying on Battle.net cache."""
+    if not map_file:
+        return None
+    candidate = Path(map_file).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path(run_config.data_dir) / "Maps" / candidate
+    if candidate.suffix.lower() != ".sc2map" or not candidate.is_file():
+        raise FileNotFoundError(f"configured replay map is missing or not an .SC2Map archive: {candidate}")
+    return candidate.read_bytes()
+
+
+def _start_replay(controller: Any, request: Any, map_data: bytes | None) -> None:
+    """Start replay playback, optionally supplying an explicit local map."""
+    if map_data is not None:
+        request.map_data = map_data
     controller.start_replay(request)
 
 
@@ -174,6 +193,7 @@ def extract_replay_viewpoint(path: str | Path, player: ReplayPlayer, *, episode_
     metadata = metadata or inspect_replay_metadata(replay_path)
     if player.player_id not in {candidate.player_id for candidate in metadata.players}:
         raise ValueError(f"player {player.player_id} is absent from {replay_path}")
+    configure_sc2_path(config.sc2_path)
     run_configs, replay_lib, sc_pb = _require_sc2()
     default_config = run_configs.get()
     replay_data = default_config.replay_data(str(replay_path))
@@ -188,14 +208,21 @@ def extract_replay_viewpoint(path: str | Path, player: ReplayPlayer, *, episode_
     terminal_outcome: str | None = None
 
     with run_config.start(want_rgb=False) as controller:
-        replay_info = controller.replay_info(replay_data)
         request = sc_pb.RequestStartReplay(
             replay_data=replay_data,
             options=sc_pb.InterfaceOptions(raw=True, score=True, show_cloaked=True, show_burrowed_shadows=True),
             disable_fog=False,
             observed_player_id=int(player.player_id),
         )
-        _start_replay(controller, run_config, replay_data, replay_info, request)
+        try:
+            _start_replay(controller, request, _map_data(run_config, config.map_file))
+        except Exception as exc:
+            if config.map_file:
+                raise RuntimeError(f"failed to start replay with configured map {config.map_file}: {exc}") from exc
+            raise RuntimeError(
+                f"failed to start replay {replay_path}. If SC2 reports a missing map archive, download the exact "
+                f"{metadata.title}.SC2Map and set map_file in configs/replays/expert_terran.yaml. Original error: {exc}"
+            ) from exc
         game_info = controller.game_info()
         width, height = _map_size(game_info, config)
         adapter, extractor = PySC2StateAdapter(width, height), FeatureExtractor(width, height)
@@ -204,7 +231,7 @@ def extract_replay_viewpoint(path: str | Path, player: ReplayPlayer, *, episode_
         previous_state = adapter.extract(controller_observation_dict(previous_response), {})
         rewards.reset(reward_metrics_from_state(previous_state))
         own_main, enemy_main = _own_main(previous_response), _enemy_start(game_info, _own_main(previous_response))
-        expert_name, opponent_name = _player_names(replay_info, player.player_id)
+        expert_name, opponent_name = f"player-{player.player_id}", "unknown"
 
         while not previous_response.player_result:
             controller.step(config.step_mul)

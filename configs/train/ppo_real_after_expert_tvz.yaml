@@ -1,0 +1,15 @@
+# On-policy Terran-versus-Zerg PPO adaptation after expert actor cloning.
+env_config: configs/env/sc2_tvz.yaml
+ppo_config: configs/model/ppo.yaml
+resume_checkpoint: outputs/checkpoints/ppo_expert_bc_tvz.pt
+checkpoint_path: outputs/checkpoints/ppo_real_after_expert_tvz.pt
+seed: 7
+device: cuda
+updates: 80
+rollout_steps: 96
+evaluation_episodes: 5
+evaluation_interval_steps: 960
+checkpoint_interval_steps: 960
+record_training_replay: true
+replay_capacity: 12288
+training_replay_path: outputs/replays/ppo_real_after_expert_tvz.npz

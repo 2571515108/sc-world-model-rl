@@ -17,9 +17,9 @@ class ArrayReplay:
         self.arrays, self.metadata, self.version = arrays, metadata, 0
         self.size = len(arrays["actions"])
         self.observation_shape = tuple(arrays["observations"].shape[1:])
-        self.episode_ids = np.asarray(metadata["episode_ids"], dtype=np.int64)
-        self.game_loops = np.asarray(metadata["game_loops"], dtype=np.int64)
-        self.opponent_ids = np.asarray([zlib.crc32(str(value).encode()) % 128 for value in metadata["opponent_ids"]], dtype=np.int64)
+        self.episode_ids = np.asarray(arrays.get("episode_ids", metadata["episode_ids"]), dtype=np.int64)
+        self.game_loops = np.asarray(arrays.get("game_loops", metadata["game_loops"]), dtype=np.int64)
+        self.opponent_ids = np.asarray(arrays.get("opponent_ids", [zlib.crc32(str(value).encode()) % 128 for value in metadata["opponent_ids"]]), dtype=np.int64)
         self.environment_types = np.asarray(metadata.get("environment_types", ["synthetic"] * self.size))
         self.opponent_actions = arrays.get("opponent_actions", np.asarray([int(info.get("opponent_action", 0)) for info in metadata["infos"]], dtype=np.int64))
         self.opponent_action_valid = arrays.get(
@@ -32,7 +32,7 @@ class ArrayReplay:
     def load(cls, path: str | Path) -> "ArrayReplay":
         """Load numeric NPZ members once; no ``MacroTransition`` allocation occurs."""
         path = Path(path); metadata = json.loads(path.with_suffix(path.suffix + ".json").read_text(encoding="utf-8"))
-        if metadata.get("format_version") not in {1, 2}:
+        if metadata.get("format_version") not in {1, 2, 3}:
             raise ValueError("unsupported replay format")
         with np.load(path, allow_pickle=False) as loaded:
             arrays = {name: loaded[name].copy() for name in loaded.files}
